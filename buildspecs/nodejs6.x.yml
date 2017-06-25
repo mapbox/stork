@@ -1,0 +1,8 @@
+version: 0.1
+phases:
+  pre_build:
+    commands:
+      - if [ -f yarn.lock ]; then yarn; else npm install; fi
+artifacts:
+  files:
+    - '**/*'

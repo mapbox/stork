@@ -1,0 +1,23 @@
+{
+  "name": "bundle-shepherd",
+  "version": "1.0.0",
+  "description": "Continuous integration system to build Lambda packages",
+  "main": "index.js",
+  "repository": "git@github.com:rclark/bundle-shepherd",
+  "author": "Ryan Clark",
+  "license": "MIT",
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "devDependencies": {
+    "@mapbox/aws-github-webhook": "^1.0.0",
+    "@mapbox/cloudfriend": "^1.8.1",
+    "eslint": "^3.19.0",
+    "eslint-plugin-node": "^4.2.2"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.49.0",
+    "got": "^6.7.1",
+    "zeroarg": "^1.0.0"
+  }
+}

@@ -1,0 +1,1 @@
+{"Version":"2008-10-17","Statement":[{"Sid": "codebuild","Effect":"Allow","Action":["ecr:GetAuthorizationToken","ecr:BatchCheckLayerAvailability","ecr:GetDownloadUrlForLayer","ecr:GetRepositoryPolicy","ecr:DescribeRepositories","ecr:ListImages","ecr:DescribeImages","ecr:BatchGetImage"],"Principal":{"Service":"codebuild.amazonaws.com"}}]}
