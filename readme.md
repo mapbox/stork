@@ -33,5 +33,5 @@ Another continuous integration system to build Lambda packages.
 
 1. Pick a bucket & prefix in your account that's going to house bundles.
 2. Running `./bin/bootstrap.sh bucket prefix` creates an initial bundle for bundle-shepherd itself.
-3. Create the bundle-shepherd stack using cfn-config
-4. Make sure that CodeBuild is given permission to access your Github account (via console)
+3. `cd Dockerfiles && ./build.sh` creates a `bundle_shepherd` repository, adds default images, and sets the repository policy.
+4. Create the bundle-shepherd stack using cfn-config
