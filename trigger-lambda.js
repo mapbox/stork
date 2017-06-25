@@ -47,6 +47,7 @@ const findProject = (options) => {
  * @param {string} options.prefix
  * @param {string} options.region - for the CodeBuild project
  * @param {string} options.role - ARN for project's IAM role
+ * @param {string} options.token - Github access token
  * @returns {Promise} CodeBuild project information
  */
 const createProject = (options) => {
@@ -56,8 +57,7 @@ const createProject = (options) => {
     serviceRole: options.role,
     source: {
       type: 'GITHUB',
-      location: `https://github.com/${options.org}/${options.repo}`,
-      auth: { type: 'OAUTH' }
+      location: `https://${options.token}@github.com/${options.org}/${options.repo}`
     },
     artifacts: {
       type: 'S3',

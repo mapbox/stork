@@ -28,3 +28,10 @@ Another continuous integration system to build Lambda packages.
   - if there is no matching project, create one
   - if there is a matching project, run a build for the desired sha
   - when running a build, if the repository **does not** contain a top-level `buildspec.yml`, bundle-shepherd provides its default as a `buildspecOverride`. If the repository **does** contain a top-level `buildspec.yml` file, then by not setting an override, the repositories' file will be used.
+
+## Bootstrapping an account
+
+1. Pick a bucket & prefix in your account that's going to house bundles.
+2. Running `./bin/bootstrap.sh bucket prefix` creates an initial bundle for bundle-shepherd itself.
+3. Create the bundle-shepherd stack using cfn-config
+4. Make sure that CodeBuild is given permission to access your Github account (via console)
