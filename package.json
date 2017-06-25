@@ -14,7 +14,7 @@
     "@mapbox/cloudfriend": "^1.8.1",
     "eslint": "^3.19.0",
     "eslint-plugin-node": "^4.2.2",
-    "zeroarg": "^1.0.0"
+    "meow": "^3.7.0"
   },
   "dependencies": {
     "aws-sdk": "^2.49.0",
