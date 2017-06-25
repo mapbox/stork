@@ -14,6 +14,7 @@ const Resources = {
   ProjectRole: {
     Type: 'AWS::IAM::Role',
     Properties: {
+      RoleName: cf.sub('${AWS::StackName}-ProjectRole'),
       AssumeRolePolicyDocument: {
         Statement: [
           {
@@ -67,6 +68,7 @@ const Resources = {
   TriggerLambdaRole: {
     Type: 'AWS::IAM::Role',
     Properties: {
+      RoleName: cf.sub('${AWS::StackName}-TriggerRole'),
       AssumeRolePolicyDocument: {
         Statement: [
           {
@@ -94,6 +96,11 @@ const Resources = {
                   'codebuild:StartBuild'
                 ],
                 Resource: '*'
+              },
+              {
+                Effect: 'Allow',
+                Action: 'iam:PassRole',
+                Resource: cf.getAtt('ProjectRole', 'Arn')
               }
             ]
           }
