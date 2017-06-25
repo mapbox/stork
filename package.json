@@ -13,11 +13,11 @@
     "@mapbox/aws-github-webhook": "^1.0.0",
     "@mapbox/cloudfriend": "^1.8.1",
     "eslint": "^3.19.0",
-    "eslint-plugin-node": "^4.2.2"
+    "eslint-plugin-node": "^4.2.2",
+    "zeroarg": "^1.0.0"
   },
   "dependencies": {
     "aws-sdk": "^2.49.0",
-    "got": "^6.7.1",
-    "zeroarg": "^1.0.0"
+    "got": "^6.7.1"
   }
 }

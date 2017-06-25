@@ -4,12 +4,11 @@ Another continuous integration system to build Lambda packages.
 
 ## Concept of a bundle-shepherd
 
-1. We would have a bundle-shepherd stack that is deployed **once** in an AWS account.
+1. A bundle-shepherd stack that is deployed **once** in an AWS account.
 
 2. This stack's parameters define
   - The S3 bucket and path where bundles will be placed
   - A Github token that CodeBuild can use to pull private code
-  - [optional] tags for cost-tracking on repo-specific CodeBuild projects
 
 3. bundle-shepherd provides a default set of images and build instructions for a set of Lambda runtime environments (e.g. `nodejs6.10` and `python2.7`).
 

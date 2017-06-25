@@ -4,6 +4,8 @@ const cf = require('@mapbox/cloudfriend');
 const buildWebhook = require('@mapbox/aws-github-webhook');
 
 const Parameters = {
+  GitSha: { Type: 'String' },
+  GithubAccessToken: { Type: 'String' },
   OutputBucket: { Type: 'String' },
   OutputPrefix: { Type: 'String' }
 };
@@ -33,12 +35,12 @@ const Resources = {
                   'logs:CreateLogStream',
                   'logs:PutLogEvents'
                 ],
-                Resource: cf.sub('arn:aws:logs:${AWS::Region}:${AWS::AccountID}:log-group/aws/codebuild/*')
+                Resource: cf.sub('arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group/aws/codebuild/*')
               },
               {
                 Effect: 'Allow',
                 Action: 's3:PutObject',
-                Resource: cf.sub('arn:aws:::${OutputBucket}/${OutputPrefix}/*')
+                Resource: cf.sub('arn:aws:s3:::${OutputBucket}/${OutputPrefix}/*')
               },
               {
                 Effect: 'Allow',
@@ -106,8 +108,8 @@ const Resources = {
       Description: 'Triggers bundle-shepherd projects',
       Role: cf.getAtt('TriggerLambdaRole', 'Arn'),
       Code: {
-        S3Bucket: '',
-        S3Key: ''
+        S3Bucket: cf.ref('OutputBucket'),
+        S3Key: cf.sub('${OutputPrefix}/bundle-shepherd/${GitSha}.zip')
       },
       Handler: 'trigger-lambda.lambda',
       Runtime: 'nodejs6.10',
@@ -117,7 +119,6 @@ const Resources = {
         Variables: {
           GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
           AWS_ACCOUNT_ID: cf.accountId,
-          AWS_DEFAULT_REGION: cf.region,
           S3_BUCKET: cf.ref('OutputBucket'),
           S3_PREFIX: cf.ref('OutputPrefix'),
           PROJECT_ROLE: cf.getAtt('ProjectRole', 'Arn')
