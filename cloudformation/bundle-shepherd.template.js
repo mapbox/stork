@@ -36,7 +36,7 @@ const Resources = {
                   'logs:CreateLogStream',
                   'logs:PutLogEvents'
                 ],
-                Resource: cf.sub('arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group/aws/codebuild/*')
+                Resource: cf.sub('arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*')
               },
               {
                 Effect: 'Allow',
