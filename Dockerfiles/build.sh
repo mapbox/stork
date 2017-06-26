@@ -23,10 +23,10 @@ uri=$(node -e "console.log(${desc}.repositories[0].repositoryUri);")
 
 # Build, tag and push the nodejs6.x docker image
 docker build -t bundle-shepherd:nodejs6.x -f ./nodejs6.x ./
-docker tag bundle-shepherd "${uri}:nodejs6.x"
+docker tag bundle-shepherd:nodejs6.x "${uri}:nodejs6.x"
 docker push "${uri}:nodejs6.x"
 
 # Build, tag and push the python2.7 docker image
 docker build -t bundle-shepherd:python2.7 -f ./python2.7 ./
-docker tag bundle-shepherd "${uri}:python2.7"
+docker tag bundle-shepherd:python2.7 "${uri}:python2.7"
 docker push "${uri}:python2.7"
