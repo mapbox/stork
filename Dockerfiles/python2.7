@@ -1,0 +1,7 @@
+FROM amazonlinux
+
+RUN yum install -y \
+  python27-devel python27-virtualenv python27-pip python27-numpy \
+  gcc gcc-c++ \
+  wget zip
+RUN pip install -U pip
