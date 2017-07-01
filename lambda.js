@@ -98,9 +98,9 @@ const createProject = (options) => {
       source: ['aws.codebuild'],
       'detail-type': ['CodeBuild Build State Change'],
       detail: {
-        'build-status': ['IN_PROGRESS', 'SUCCEEDED', 'FAILED', 'STOPPED']
-      },
-      'project-name': [project.name]
+        'build-status': ['IN_PROGRESS', 'SUCCEEDED', 'FAILED', 'STOPPED'],
+        'project-name': [project.name]
+      }
     }),
     State: 'ENABLED'
   };
