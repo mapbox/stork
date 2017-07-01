@@ -92,7 +92,9 @@ const Resources = {
                 Action: [
                   'codebuild:BatchGetProjects',
                   'codebuild:CreateProject',
-                  'codebuild:StartBuild'
+                  'codebuild:StartBuild',
+                  'events:PutRule',
+                  'events:PutTargets'
                 ],
                 Resource: '*'
               },
@@ -117,7 +119,7 @@ const Resources = {
         S3Bucket: cf.ref('OutputBucket'),
         S3Key: cf.sub('${OutputPrefix}/bundle-shepherd/${GitSha}.zip')
       },
-      Handler: 'trigger-lambda.lambda',
+      Handler: 'lambda.trigger',
       Runtime: 'nodejs6.10',
       Timeout: 300,
       MemorySize: 512,
@@ -128,9 +130,75 @@ const Resources = {
           AWS_ACCOUNT_ID: cf.accountId,
           S3_BUCKET: cf.ref('OutputBucket'),
           S3_PREFIX: cf.ref('OutputPrefix'),
-          PROJECT_ROLE: cf.getAtt('ProjectRole', 'Arn')
+          PROJECT_ROLE: cf.getAtt('ProjectRole', 'Arn'),
+          STATUS_FUNCTION: cf.getAtt('StatusLambda', 'Arn')
         }
       }
+    }
+  },
+  StatusLambdaRole: {
+    Type: 'AWS::IAM::Role',
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: { Service: 'lambda.amazonaws.com' },
+            Action: 'sts:AssumeRole'
+          }
+        ]
+      },
+      Policies: [
+        {
+          PolicyName: 'codebuild-status',
+          PolicyDocument: {
+            Statement: [
+              {
+                Effect: 'Allow',
+                Action: 'logs:*',
+                Resource: cf.getAtt('StatusLambdaLogs', 'Arn')
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  StatusLambdaLogs: {
+    Type: 'AWS::Logs::LogGroup',
+    Properties: {
+      LogGroupName: cf.sub('/aws/lambda/${AWS::StackName}-status'),
+      RetentionInDays: 14
+    }
+  },
+  StatusLambda: {
+    Type: 'AWS::Lambda::Function',
+    Properties: {
+      FunctionName: cf.sub('${AWS::StackName}-status'),
+      Description: 'Reports status on bundle-shepherd projects',
+      Role: cf.getAtt('StatusLambdaRole', 'Arn'),
+      Code: {
+        S3Bucket: cf.ref('OutputBucket'),
+        S3Key: cf.sub('${OutputPrefix}/bundle-shepherd/${GitSha}.zip')
+      },
+      Handler: 'lambda.status',
+      Runtime: 'nodejs6.10',
+      Timeout: 300,
+      MemorySize: 512,
+      Environment: {
+        Variables: {
+          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken')
+        }
+      }
+    }
+  },
+  StatusFunctionPermission: {
+    Type: 'AWS::Lambda::Permission',
+    Properties: {
+      Action: 'lambda:InvokeFunction',
+      Principal: 'events.amazonaws.com',
+      FunctionName: cf.getAtt('StatusLambda', 'Arn'),
+      SourceArn: '*'
     }
   }
 };

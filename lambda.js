@@ -47,12 +47,13 @@ const findProject = (options) => {
  * @param {string} options.prefix
  * @param {string} options.region - for the CodeBuild project
  * @param {string} options.role - ARN for project's IAM role
+ * @param {string} options.status - ARN for status Lambda function
  * @param {string} options.token - Github access token
  * @param {boolean} options.oauth
  * @returns {Promise} CodeBuild project information
  */
 const createProject = (options) => {
-  const params = {
+  const project = {
     name: projectName(options.org, options.repo, options.imageUri),
     description: `Lambda builds for ${options.org}/${options.repo}`,
     serviceRole: options.role,
@@ -78,9 +79,33 @@ const createProject = (options) => {
     }
   };
 
+  const rule = {
+    Name: project.name,
+    Description: `Build status notifications for ${project.name}`,
+    EventPattern: JSON.stringify({
+      source: ['aws.codebuild'],
+      'detail-type': ['CodeBuild Build State Change'],
+      detail: {
+        'build-status': ['IN_PROGRESS', 'SUCCEEDED', 'FAILED', 'STOPPED']
+      },
+      'project-name': [project.name]
+    }),
+    State: 'ENABLED'
+  };
+
   const codebuild = new AWS.CodeBuild({ region: options.region });
-  return codebuild.createProject(params).promise()
-    .then((data) => data.project);
+  const events = new AWS.CloudWatchEvents({ region: options.region });
+
+  return Promise.all([
+    codebuild.createProject(project).promise(),
+    events.putRule(rule).promise().then((data) => {
+      const target = {
+        Rule: data.RuleArn,
+        Targets: [{ Id: 'invoke-lambda', Arn: options.status }]
+      };
+      return events.putTargets(target).promise();
+    })
+  ]).then((results) => results[0].project);
 };
 
 /**
@@ -210,7 +235,7 @@ const getDefaultBuildspec = (defaultImage) => {
   return fs.readFileSync(buildspec, 'utf8');
 };
 
-const lambda = (event, context, callback) => {
+const trigger = (event, context, callback) => {
   const commit = JSON.parse(event.Records[0].Sns.Message);
   const options = {
     org: commit.repository.owner.name,
@@ -222,6 +247,7 @@ const lambda = (event, context, callback) => {
     bucket: process.env.S3_BUCKET,
     prefix: process.env.S3_PREFIX,
     role: process.env.PROJECT_ROLE,
+    status: process.env.STATUS_FUNCTION,
     oauth: process.env.USE_OAUTH === 'true' ? true : false
   };
 
@@ -263,6 +289,12 @@ const lambda = (event, context, callback) => {
     .catch((err) => callback(err));
 };
 
+const status = (event, context, callback) => {
+  console.log(JSON.stringify(event));
+  callback();
+};
+
 module.exports = {
-  lambda
+  trigger,
+  status
 };
