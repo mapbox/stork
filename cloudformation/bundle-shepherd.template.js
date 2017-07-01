@@ -4,11 +4,11 @@ const cf = require('@mapbox/cloudfriend');
 const buildWebhook = require('@mapbox/aws-github-webhook');
 
 const Parameters = {
-  GitSha: { Type: 'String' },
-  GithubAccessToken: { Type: 'String' },
-  UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'] },
-  OutputBucket: { Type: 'String' },
-  OutputPrefix: { Type: 'String' }
+  GitSha: { Type: 'String', Description: 'Current bundle-shepherd git SHA' },
+  GithubAccessToken: { Type: 'String', Description: '[secure] A Github access token with repo scope' },
+  UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'], Description: 'Whether AWS connect to Github via OAuth or via token' },
+  OutputBucket: { Type: 'String', Description: 'Bucket to house bundles' },
+  OutputPrefix: { Type: 'String', Description: 'Prefix within bucket for bundles' }
 };
 
 const Resources = {
