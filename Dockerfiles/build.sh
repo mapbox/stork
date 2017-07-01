@@ -5,7 +5,7 @@ set -eu
 region=${1}
 
 # Log docker client into ECR
-eval "$(aws ecr get-login --region ${region})"
+eval "$(aws ecr get-login --region ${region} --no-include-email)"
 
 # Make sure the ECR repository exists
 aws ecr describe-repositories --region ${region} --repository-names bundle-shepherd > /dev/null 2>&1 || \

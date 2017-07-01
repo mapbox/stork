@@ -198,7 +198,7 @@ const Resources = {
       Action: 'lambda:InvokeFunction',
       Principal: 'events.amazonaws.com',
       FunctionName: cf.getAtt('StatusLambda', 'Arn'),
-      SourceArn: '*'
+      SourceArn: cf.sub('arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/*')
     }
   }
 };
