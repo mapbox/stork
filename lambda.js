@@ -61,10 +61,7 @@ const createProject = (options) => {
       type: 'GITHUB',
       location: options.oauth
         ? `https://github.com/${options.org}/${options.repo}`
-        : `https://${options.token}@github.com/${options.org}/${options.repo}`,
-      auth: options.oauth
-        ? { type: 'OAUTH' }
-        : undefined
+        : `https://${options.token}@github.com/${options.org}/${options.repo}`
     },
     artifacts: {
       type: 'S3',
@@ -78,6 +75,8 @@ const createProject = (options) => {
       computeType: `BUILD_GENERAL1_${options.size.toUpperCase()}`
     }
   };
+
+  if (options.oauth) project.source.auth = { type: 'OAUTH' };
 
   const rule = {
     Name: project.name,
