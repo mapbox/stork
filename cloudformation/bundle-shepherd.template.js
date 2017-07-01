@@ -157,6 +157,11 @@ const Resources = {
                 Effect: 'Allow',
                 Action: 'logs:*',
                 Resource: cf.getAtt('StatusLambdaLogs', 'Arn')
+              },
+              {
+                Effect: 'Allow',
+                Action: 'codebuild:BatchGetBuilds',
+                Resource: '*'
               }
             ]
           }

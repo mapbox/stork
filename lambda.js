@@ -2,6 +2,7 @@
 
 /* eslint-disable no-console */
 
+const url = require('url');
 const fs = require('fs');
 const path = require('path');
 const got = require('got');
@@ -308,8 +309,59 @@ const trigger = (event, context, callback) => {
 };
 
 const status = (event, context, callback) => {
-  console.log(JSON.stringify(event));
-  callback();
+  const token = process.env.GITHUB_ACCESS_TOKEN;
+  const id = event.detail['build-id'];
+  const phase = event.detail['build-status'];
+
+  const states = {
+    IN_PROGRESS: 'pending',
+    SUCCEEDED: 'success',
+    FAILED: 'failure',
+    STOPPED: 'error'
+  };
+
+  const descriptions = {
+    IN_PROGRESS: 'Waiting for AWS CodeBuild',
+    SUCCEEDED: 'Your build succeeded',
+    FAILED: 'Your build failed',
+    STOPPED: 'Your build encountered an error'
+  };
+
+  const codebuild = new AWS.CodeBuild();
+  codebuild.batchGetBuilds({ ids: [id] }).promise()
+    .catch((err) => Traceable.promise(err))
+    .then((data) => {
+      const build = data.builds[0];
+      if (!build) return callback();
+
+      const logs = build.logs.deepLink;
+      const sha = build.sourceVersion;
+      const source = url.parse(build.source.location);
+      const owner = source.pathname.split('/')[1];
+      const repo = source.pathname.split('/')[2].replace(/.git$/, '');
+
+      const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}?access_token=${token}`;
+      const status = {
+        context: 'bundle-shepherd',
+        description: descriptions[phase],
+        state: states[phase],
+        target_url: logs
+      };
+
+      return got.post(uri, {
+        json: true,
+        headers: {
+          'Content-type': 'application/json',
+          'User-Agent': 'github.com/mapbox/bundle-shepherd'
+        },
+        body: JSON.stringify(status)
+      });
+    })
+    .then(() => callback())
+    .catch((err) => {
+      console.log(err);
+      callback(err);
+    });
 };
 
 module.exports = {
