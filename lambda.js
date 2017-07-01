@@ -354,11 +354,14 @@ const status = (event, context, callback) => {
           'Content-type': 'application/json',
           'User-Agent': 'github.com/mapbox/bundle-shepherd'
         },
-        body: status
+        body: JSON.stringify(status)
       });
     })
     .then(() => callback())
-    .catch((err) => callback(err));
+    .catch((err) => {
+      console.log(err);
+      callback(err);
+    });
 };
 
 module.exports = {
