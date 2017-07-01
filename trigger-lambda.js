@@ -1,12 +1,12 @@
 'use strict';
 
+/* eslint-disable no-console */
+
 const fs = require('fs');
 const path = require('path');
 const got = require('got');
 const querystring = require('querystring');
 const AWS = require('aws-sdk');
-
-const log = (msg) => process.stdout.write(`${msg}\n`);
 
 const projectName = (org, repo, imageUri) => {
   const imageName = imageUri.split('/').pop()
@@ -29,7 +29,7 @@ const findProject = (options) => {
   const codebuild = new AWS.CodeBuild({ region: options.region });
   const name = projectName(options.org, options.repo, options.imageUri);
 
-  log(`Find project args: ${JSON.stringify({ names: [name] })}`);
+  console.log(`Looking for project: ${name}`);
 
   return codebuild.batchGetProjects({ names: [name] }).promise()
     .then((data) => data.projects[0]);
@@ -48,6 +48,7 @@ const findProject = (options) => {
  * @param {string} options.region - for the CodeBuild project
  * @param {string} options.role - ARN for project's IAM role
  * @param {string} options.token - Github access token
+ * @param {boolean} options.oauth
  * @returns {Promise} CodeBuild project information
  */
 const createProject = (options) => {
@@ -57,7 +58,12 @@ const createProject = (options) => {
     serviceRole: options.role,
     source: {
       type: 'GITHUB',
-      location: `https://${options.token}@github.com/${options.org}/${options.repo}`
+      location: options.oauth
+        ? `https://github.com/${options.org}/${options.repo}`
+        : `https://${options.token}@github.com/${options.org}/${options.repo}`,
+      auth: options.oauth
+        ? { type: 'OAUTH' }
+        : undefined
     },
     artifacts: {
       type: 'S3',
@@ -104,8 +110,6 @@ const runBuild = (options) => {
   };
 
   if (options.buildspec) params.buildspecOverride = options.buildspec;
-
-  log(`Run a build: ${JSON.stringify(params)}`);
 
   const codebuild = new AWS.CodeBuild({ region: options.region });
   return codebuild.startBuild(params).promise()
@@ -172,7 +176,7 @@ const checkRepoOverrides = (options) => {
       if (config.size) result.size = config.size;
     }
 
-    log(`Override result: ${JSON.stringify(result)}`);
+    console.log(`Override result: ${JSON.stringify(result)}`);
 
     return result;
   });
@@ -217,17 +221,18 @@ const lambda = (event, context, callback) => {
     region: process.env.AWS_DEFAULT_REGION,
     bucket: process.env.S3_BUCKET,
     prefix: process.env.S3_PREFIX,
-    role: process.env.PROJECT_ROLE
+    role: process.env.PROJECT_ROLE,
+    oauth: process.env.USE_OAUTH === 'true' ? true : false
   };
 
-  log(`Looking for repo overrides: ${JSON.stringify(options)}`);
+  console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
 
   return checkRepoOverrides(options)
     .then((config) => {
       options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
       options.size = config.size;
 
-      log(`Looking for existing project: ${JSON.stringify(options)}`);
+      console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.image}`);
 
       return Promise.all([config, findProject(options)]);
     })
@@ -235,9 +240,9 @@ const lambda = (event, context, callback) => {
       const config = results[0];
       const project = results[1];
 
-      log(project
+      console.log(project
         ? 'Found existing project'
-        : `Creating a new project: ${JSON.stringify(options)}`
+        : 'Creating a new project'
       );
 
       return Promise.all([
@@ -250,7 +255,7 @@ const lambda = (event, context, callback) => {
       if (!config.buildspec)
         options.buildspec = getDefaultBuildspec(config.image);
 
-      log(`Running a build: ${JSON.stringify(options)}`);
+      console.log(`Running a build for ${options.org}/${options.repo}@${options.sha}`);
 
       return runBuild(options);
     })

@@ -6,6 +6,7 @@ const buildWebhook = require('@mapbox/aws-github-webhook');
 const Parameters = {
   GitSha: { Type: 'String' },
   GithubAccessToken: { Type: 'String' },
+  UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'] },
   OutputBucket: { Type: 'String' },
   OutputPrefix: { Type: 'String' }
 };
@@ -122,6 +123,7 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
+          USE_OAUTH: cf.ref('UseOAuth'),
           GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
           AWS_ACCOUNT_ID: cf.accountId,
           S3_BUCKET: cf.ref('OutputBucket'),
