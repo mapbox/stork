@@ -23,7 +23,8 @@ class Traceable extends Error {
 const projectName = (org, repo, imageUri) => {
   const imageName = imageUri.split('/').pop()
     .replace(/:/g, '_')
-    .replace(/\./g, '_');
+    .replace(/\./g, '_')
+    .replace(/bundle-shepherd_/, '');
   return `${org}_${repo}_${imageName}`;
 };
 
@@ -113,11 +114,15 @@ const createProject = (options) => {
       .catch((err) => Traceable.promise(err)),
     events.putRule(rule).promise()
       .catch((err) => Traceable.promise(err))
-      .then((data) => events.putTargets({
-        Rule: data.RuleArn,
+  ]).then((results) => Promise.all([
+    results[0].project,
+    events
+      .putTargets({
+        Rule: project.name,
         Targets: [{ Id: 'invoke-lambda', Arn: options.status }]
-      }).promise().catch((err) => Traceable.promise(err)))
-  ]).then((results) => results[0].project);
+      }).promise()
+      .catch((err) => Traceable.promise(err))
+  ])).then((results) => results[0]);
 };
 
 /**
