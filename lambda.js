@@ -8,6 +8,7 @@ const path = require('path');
 const got = require('got');
 const querystring = require('querystring');
 const AWS = require('aws-sdk');
+const decrypt = require('decrypt-kms-env');
 
 class Traceable extends Error {
   constructor(err) {
@@ -255,113 +256,121 @@ const getDefaultBuildspec = (defaultImage) => {
 };
 
 const trigger = (event, context, callback) => {
-  const commit = JSON.parse(event.Records[0].Sns.Message);
-  const options = {
-    org: commit.repository.owner.name,
-    repo: commit.repository.name,
-    sha: commit.after,
-    token: process.env.GITHUB_ACCESS_TOKEN,
-    accountId: process.env.AWS_ACCOUNT_ID,
-    region: process.env.AWS_DEFAULT_REGION,
-    bucket: process.env.S3_BUCKET,
-    prefix: process.env.S3_PREFIX,
-    role: process.env.PROJECT_ROLE,
-    status: process.env.STATUS_FUNCTION,
-    oauth: process.env.USE_OAUTH === 'true' ? true : false
-  };
+  decrypt(process.env, (err) => {
+    if (err) return callback(err);
 
-  console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
+    const commit = JSON.parse(event.Records[0].Sns.Message);
+    const options = {
+      org: commit.repository.owner.name,
+      repo: commit.repository.name,
+      sha: commit.after,
+      token: process.env.GITHUB_ACCESS_TOKEN,
+      accountId: process.env.AWS_ACCOUNT_ID,
+      region: process.env.AWS_DEFAULT_REGION,
+      bucket: process.env.S3_BUCKET,
+      prefix: process.env.S3_PREFIX,
+      role: process.env.PROJECT_ROLE,
+      status: process.env.STATUS_FUNCTION,
+      oauth: process.env.USE_OAUTH === 'true' ? true : false
+    };
 
-  return checkRepoOverrides(options)
-    .then((config) => {
-      options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
-      options.size = config.size;
+    console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
 
-      console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.image}`);
+    return checkRepoOverrides(options)
+      .then((config) => {
+        options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
+        options.size = config.size;
 
-      return Promise.all([config, findProject(options)]);
-    })
-    .then((results) => {
-      const config = results[0];
-      const project = results[1];
+        console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.image}`);
 
-      console.log(project
-        ? 'Found existing project'
-        : 'Creating a new project'
-      );
+        return Promise.all([config, findProject(options)]);
+      })
+      .then((results) => {
+        const config = results[0];
+        const project = results[1];
 
-      return Promise.all([
-        config,
-        project ? project : createProject(options)
-      ]);
-    })
-    .then((results) => {
-      const config = results[0];
-      if (!config.buildspec)
-        options.buildspec = getDefaultBuildspec(config.image);
+        console.log(project
+          ? 'Found existing project'
+          : 'Creating a new project'
+        );
 
-      console.log(`Running a build for ${options.org}/${options.repo}@${options.sha}`);
+        return Promise.all([
+          config,
+          project ? project : createProject(options)
+        ]);
+      })
+      .then((results) => {
+        const config = results[0];
+        if (!config.buildspec)
+          options.buildspec = getDefaultBuildspec(config.image);
 
-      return runBuild(options);
-    })
-    .then((data) => callback(null, data))
-    .catch((err) => callback(err));
+        console.log(`Running a build for ${options.org}/${options.repo}@${options.sha}`);
+
+        return runBuild(options);
+      })
+      .then((data) => callback(null, data))
+      .catch((err) => callback(err));
+  });
 };
 
 const status = (event, context, callback) => {
-  const token = process.env.GITHUB_ACCESS_TOKEN;
-  const id = event.detail['build-id'];
-  const phase = event.detail['build-status'];
+  decrypt(process.env, (err) => {
+    if (err) return callback(err);
 
-  const states = {
-    IN_PROGRESS: 'pending',
-    SUCCEEDED: 'success',
-    FAILED: 'failure',
-    STOPPED: 'error'
-  };
+    const token = process.env.GITHUB_ACCESS_TOKEN;
+    const id = event.detail['build-id'];
+    const phase = event.detail['build-status'];
 
-  const descriptions = {
-    IN_PROGRESS: 'Your build is in progress',
-    SUCCEEDED: 'Your build succeeded',
-    FAILED: 'Your build failed',
-    STOPPED: 'Your build encountered an error'
-  };
+    const states = {
+      IN_PROGRESS: 'pending',
+      SUCCEEDED: 'success',
+      FAILED: 'failure',
+      STOPPED: 'error'
+    };
 
-  const codebuild = new AWS.CodeBuild();
-  codebuild.batchGetBuilds({ ids: [id] }).promise()
-    .catch((err) => Traceable.promise(err))
-    .then((data) => {
-      const build = data.builds[0];
-      if (!build) return callback();
+    const descriptions = {
+      IN_PROGRESS: 'Your build is in progress',
+      SUCCEEDED: 'Your build succeeded',
+      FAILED: 'Your build failed',
+      STOPPED: 'Your build encountered an error'
+    };
 
-      const logs = build.logs.deepLink;
-      const sha = build.sourceVersion;
-      const source = url.parse(build.source.location);
-      const owner = source.pathname.split('/')[1];
-      const repo = source.pathname.split('/')[2].replace(/.git$/, '');
+    const codebuild = new AWS.CodeBuild();
+    codebuild.batchGetBuilds({ ids: [id] }).promise()
+      .catch((err) => Traceable.promise(err))
+      .then((data) => {
+        const build = data.builds[0];
+        if (!build) return callback();
 
-      const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}?access_token=${token}`;
-      const status = {
-        context: 'bundle-shepherd',
-        description: descriptions[phase],
-        state: states[phase],
-        target_url: logs
-      };
+        const logs = build.logs.deepLink;
+        const sha = build.sourceVersion;
+        const source = url.parse(build.source.location);
+        const owner = source.pathname.split('/')[1];
+        const repo = source.pathname.split('/')[2].replace(/.git$/, '');
 
-      return got.post(uri, {
-        json: true,
-        headers: {
-          'Content-type': 'application/json',
-          'User-Agent': 'github.com/mapbox/bundle-shepherd'
-        },
-        body: JSON.stringify(status)
+        const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}?access_token=${token}`;
+        const status = {
+          context: 'bundle-shepherd',
+          description: descriptions[phase],
+          state: states[phase],
+          target_url: logs
+        };
+
+        return got.post(uri, {
+          json: true,
+          headers: {
+            'Content-type': 'application/json',
+            'User-Agent': 'github.com/mapbox/bundle-shepherd'
+          },
+          body: JSON.stringify(status)
+        });
+      })
+      .then(() => callback())
+      .catch((err) => {
+        console.log(err);
+        callback(err);
       });
-    })
-    .then(() => callback())
-    .catch((err) => {
-      console.log(err);
-      callback(err);
-    });
+  });
 };
 
 module.exports = {

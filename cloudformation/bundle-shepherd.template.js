@@ -102,6 +102,11 @@ const Resources = {
                 Effect: 'Allow',
                 Action: 'iam:PassRole',
                 Resource: cf.getAtt('ProjectRole', 'Arn')
+              },
+              {
+                Effect: 'Allow',
+                Action: 'kms:Decrypt',
+                Resource: cf.importValue('cloudformation-kms-production')
               }
             ]
           }
@@ -162,6 +167,11 @@ const Resources = {
                 Effect: 'Allow',
                 Action: 'codebuild:BatchGetBuilds',
                 Resource: '*'
+              },
+              {
+                Effect: 'Allow',
+                Action: 'kms:Decrypt',
+                Resource: cf.importValue('cloudformation-kms-production')
               }
             ]
           }
