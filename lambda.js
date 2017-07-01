@@ -321,7 +321,7 @@ const status = (event, context, callback) => {
   };
 
   const descriptions = {
-    IN_PROGRESS: 'Waiting for AWS CodeBuild',
+    IN_PROGRESS: 'Your build is in progress',
     SUCCEEDED: 'Your build succeeded',
     FAILED: 'Your build failed',
     STOPPED: 'Your build encountered an error'
