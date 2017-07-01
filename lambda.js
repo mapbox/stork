@@ -8,6 +8,18 @@ const got = require('got');
 const querystring = require('querystring');
 const AWS = require('aws-sdk');
 
+class Traceable extends Error {
+  constructor(err) {
+    super();
+    Object.assign(this, err);
+    Error.captureStackTrace(this, Traceable);
+  }
+
+  static promise(err) {
+    return Promise.reject(new Traceable(err));
+  }
+}
+
 const projectName = (org, repo, imageUri) => {
   const imageName = imageUri.split('/').pop()
     .replace(/:/g, '_')
@@ -32,6 +44,7 @@ const findProject = (options) => {
   console.log(`Looking for project: ${name}`);
 
   return codebuild.batchGetProjects({ names: [name] }).promise()
+    .catch((err) => Traceable.promise(err))
     .then((data) => data.projects[0]);
 };
 
@@ -96,14 +109,14 @@ const createProject = (options) => {
   const events = new AWS.CloudWatchEvents({ region: options.region });
 
   return Promise.all([
-    codebuild.createProject(project).promise(),
-    events.putRule(rule).promise().then((data) => {
-      const target = {
+    codebuild.createProject(project).promise()
+      .catch((err) => Traceable.promise(err)),
+    events.putRule(rule).promise()
+      .catch((err) => Traceable.promise(err))
+      .then((data) => events.putTargets({
         Rule: data.RuleArn,
         Targets: [{ Id: 'invoke-lambda', Arn: options.status }]
-      };
-      return events.putTargets(target).promise();
-    })
+      }).promise().catch((err) => Traceable.promise(err)))
   ]).then((results) => results[0].project);
 };
 
@@ -137,6 +150,7 @@ const runBuild = (options) => {
 
   const codebuild = new AWS.CodeBuild({ region: options.region });
   return codebuild.startBuild(params).promise()
+    .catch((err) => Traceable.promise(err))
     .then((data) => data.build);
 };
 
