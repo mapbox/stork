@@ -6,6 +6,7 @@ const buildWebhook = require('@mapbox/aws-github-webhook');
 const Parameters = {
   GitSha: { Type: 'String', Description: 'Current bundle-shepherd git SHA' },
   GithubAccessToken: { Type: 'String', Description: '[secure] A Github access token with repo scope' },
+  NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
   UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'], Description: 'Whether AWS connect to Github via OAuth or via token' },
   OutputBucket: { Type: 'String', Description: 'Bucket to house bundles' },
   OutputPrefix: { Type: 'String', Description: 'Prefix within bucket for bundles' }
@@ -51,6 +52,11 @@ const Resources = {
                   'ecr:BatchCheckLayerAvailability'
                 ],
                 Resource: '*'
+              },
+              {
+                Effect: 'Allow',
+                Action: 'kms:Decrypt',
+                Resource: cf.importValue('cloudformation-kms-production')
               }
             ]
           }
@@ -107,6 +113,14 @@ const Resources = {
                 Effect: 'Allow',
                 Action: 'kms:Decrypt',
                 Resource: cf.importValue('cloudformation-kms-production')
+              },
+              {
+                Effect: 'Allow',
+                Action: [
+                  'logs:CreateLogGroup',
+                  'logs:PutRetentionPolicy'
+                ],
+                Resource: cf.sub('arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*')
               }
             ]
           }
@@ -132,6 +146,7 @@ const Resources = {
         Variables: {
           USE_OAUTH: cf.ref('UseOAuth'),
           GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
+          NPM_ACCESS_TOKEN: cf.ref('NpmAccessToken'),
           AWS_ACCOUNT_ID: cf.accountId,
           S3_BUCKET: cf.ref('OutputBucket'),
           S3_PREFIX: cf.ref('OutputPrefix'),

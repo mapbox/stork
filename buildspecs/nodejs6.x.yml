@@ -2,7 +2,10 @@ version: 0.1
 phases:
   pre_build:
     commands:
+      - npm install -g decrypt-kms-env
+      - eval $(decrypt-kms-env) && echo "//registry.npmjs.org/:_authToken=${NPM_ACCESS_TOKEN}" > .npmrc
       - if [ -f yarn.lock ]; then yarn install --production; else npm install --production; fi
+      - rm -f .npmrc
       - rm -rf .git/
 artifacts:
   files:

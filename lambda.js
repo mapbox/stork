@@ -65,6 +65,7 @@ const findProject = (options) => {
  * @param {string} options.role - ARN for project's IAM role
  * @param {string} options.status - ARN for status Lambda function
  * @param {string} options.token - Github access token
+ * @param {string} options.npmToken - encrypted NPM access token
  * @param {boolean} options.oauth
  * @returns {Promise} CodeBuild project information
  */
@@ -88,7 +89,10 @@ const createProject = (options) => {
     environment: {
       type: 'LINUX_CONTAINER',
       image: options.imageUri,
-      computeType: `BUILD_GENERAL1_${options.size.toUpperCase()}`
+      computeType: `BUILD_GENERAL1_${options.size.toUpperCase()}`,
+      environmentVariables: [
+        { name: 'NPM_ACCESS_TOKEN', value: options.npmToken }
+      ]
     }
   };
 
@@ -108,23 +112,37 @@ const createProject = (options) => {
     State: 'ENABLED'
   };
 
+  const targets = {
+    Rule: project.name,
+    Targets: [{ Id: 'invoke-lambda', Arn: options.status }]
+  };
+
+  const logGroup = { logGroupName: `/aws/codebuld/${project.name}` };
+  const retention = Object.assign({ retentionInDays: 14 }, logGroup);
+
   const codebuild = new AWS.CodeBuild({ region: options.region });
   const events = new AWS.CloudWatchEvents({ region: options.region });
+  const logs = new AWS.CloudWatchLogs({ region: options.region });
 
-  return Promise.all([
-    codebuild.createProject(project).promise()
-      .catch((err) => Traceable.promise(err)),
-    events.putRule(rule).promise()
+  return logs.createLogGroup(logGroup).promise()
       .catch((err) => Traceable.promise(err))
-  ]).then((results) => Promise.all([
-    results[0].project,
-    events
-      .putTargets({
-        Rule: project.name,
-        Targets: [{ Id: 'invoke-lambda', Arn: options.status }]
-      }).promise()
-      .catch((err) => Traceable.promise(err))
-  ])).then((results) => results[0]);
+
+    .then(() => logs.putRetentionPolicy(retention).promise()
+      .catch((err) => Traceable.promise(err)))
+
+    .then(() => codebuild.createProject(project).promise()
+      .catch((err) => Traceable.promise(err)))
+
+    .then(() => events.putRule(rule).promise()
+      .catch((err) => Traceable.promise(err)))
+
+    .then((results) => Promise.all([
+      results[0].project,
+      events.putTargets(targets).promise()
+        .catch((err) => Traceable.promise(err))
+    ]))
+
+    .then((results) => results[0]);
 };
 
 /**
@@ -256,6 +274,8 @@ const getDefaultBuildspec = (defaultImage) => {
 };
 
 const trigger = (event, context, callback) => {
+  const encryptedNpmToken = process.env.NPM_ACCESS_TOKEN;
+
   decrypt(process.env, (err) => {
     if (err) return callback(err);
 
@@ -265,6 +285,7 @@ const trigger = (event, context, callback) => {
       repo: commit.repository.name,
       sha: commit.after,
       token: process.env.GITHUB_ACCESS_TOKEN,
+      npmToken: encryptedNpmToken,
       accountId: process.env.AWS_ACCOUNT_ID,
       region: process.env.AWS_DEFAULT_REGION,
       bucket: process.env.S3_BUCKET,
