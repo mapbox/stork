@@ -117,7 +117,7 @@ const createProject = (options) => {
     Targets: [{ Id: 'invoke-lambda', Arn: options.status }]
   };
 
-  const logGroup = { logGroupName: `/aws/codebuld/${project.name}` };
+  const logGroup = { logGroupName: `/aws/codebuild/${project.name}` };
   const retention = Object.assign({ retentionInDays: 14 }, logGroup);
 
   const codebuild = new AWS.CodeBuild({ region: options.region });
