@@ -125,7 +125,11 @@ const createProject = (options) => {
   const logs = new AWS.CloudWatchLogs({ region: options.region });
 
   return logs.createLogGroup(logGroup).promise()
-      .catch((err) => Traceable.promise(err))
+      .catch((err) => {
+        if (err && err.message !== 'The specified log group already exists')
+          return Traceable.promise(err);
+        return Promise.resolve();
+      })
 
     .then(() => logs.putRetentionPolicy(retention).promise()
       .catch((err) => Traceable.promise(err)))
