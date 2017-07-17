@@ -14,21 +14,29 @@ const cli = meow(`
   USAGE: ./bin/bootstrap.js [options]
 
   Bootstraps bundle-shepherd stacks in a set of AWS regions. All options are not optional.
-  
+
   OPTIONS:
     -r, --regions           a set of regions to bootstrap
     -b, --bucket-basename   the root name of the bucket that will house bundles
     -p, --bundle-prefix     the prefix under which bundles will reside
-    -t, --token             github access token
+    -g, --github-token      github access token
+    -n, --npm-token         npm access token
+    -o, --oauth             [false] use OAuth (must already be configured)
 `, {
   alias: {
     r: 'regions',
     b: 'bucket-basename',
     p: 'bundle-prefix',
-    t: 'token'
+    g: 'github-token',
+    n: 'npm-token',
+    o: 'oauth'
   },
-  string: ['bucket-basename', 'bundle-prefix'],
-  array: ['regions']
+  string: ['bucket-basename', 'bundle-prefix', 'github-token', 'npm-token'],
+  boolean: ['oauth'],
+  array: ['regions'],
+  default: {
+    oauth: false
+  }
 });
 
 const regions = Array.isArray(cli.flags.regions)
@@ -92,7 +100,9 @@ const deployStack = (region, bucket) => {
       OnFailure: 'DELETE',
       Parameters: [
         { ParameterKey: 'GitSha', ParameterValue: gitsha },
-        { ParameterKey: 'GithubAccessToken', ParameterValue: cli.flags.token },
+        { ParameterKey: 'UseOAuth', ParameterValue: cli.flags.oauth.toString() },
+        { ParameterKey: 'NpmAccessToken', ParameterValue: cli.flags.npmToken },
+        { ParameterKey: 'GithubAccessToken', ParameterValue: cli.flags.githubToken },
         { ParameterKey: 'OutputBucket', ParameterValue: bucket },
         { ParameterKey: 'OutputPrefix', ParameterValue: cli.flags.bundlePrefix }
       ],

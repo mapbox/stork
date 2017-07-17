@@ -133,8 +133,11 @@ const createProject = (options) => {
     .then(() => codebuild.createProject(project).promise()
       .catch((err) => Traceable.promise(err)))
 
-    .then(() => events.putRule(rule).promise()
-      .catch((err) => Traceable.promise(err)))
+    .then((data) => Promise.all([
+      data.project,
+      events.putRule(rule).promise()
+      .catch((err) => Traceable.promise(err))
+    ]))
 
     .then((results) => Promise.all([
       results[0].project,
@@ -302,7 +305,7 @@ const trigger = (event, context, callback) => {
         options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
         options.size = config.size;
 
-        console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.image}`);
+        console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.imageUri}`);
 
         return Promise.all([config, findProject(options)]);
       })
