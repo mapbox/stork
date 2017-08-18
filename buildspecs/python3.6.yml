@@ -2,10 +2,8 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - pip3 install -r ./requirements.txt -t /tmp/vendored
-      - rm -rf .git/
-      - cp -r . /tmp/vendored
+      - pip3 install -r ./requirements.txt -t .
+      - rm -rf .git/ requirements.txt
 artifacts:
   files:
     - '**/*'
-  base-directory: /tmp/vendored
