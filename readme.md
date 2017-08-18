@@ -136,7 +136,7 @@ There are three default images provided by bundle-shepherd:
 - `python2.7`
 - `python3.6`
 
-If you select either of these, bundle-shepherd will build your `.zip` file using its default images and build instructions for that runtime. You may also specify the URI of any other Docker image. If you choose to do so, you will have to also provide your own `buildspec.yml`.
+If you select any of these, bundle-shepherd will build your `.zip` file using its default images and build instructions for that runtime. You may also specify the URI of any other Docker image. If you choose to do so, you will have to also provide your own `buildspec.yml`.
 
 ### size
 
