@@ -121,7 +121,7 @@ This file has the following structure:
 
 ```json
 {
-  "image": "image identifier",
+  "image": "image name or full image url",
   "size": "one of small, medium, or large"
 }
 ```
@@ -130,12 +130,13 @@ Both fields are optional, and if the default values are fine, you need not inclu
 
 ### image
 
-There are two default images provided by bundle-shepherd:
+There are three default images provided by bundle-shepherd:
 
 - `nodejs6.x` (default)
 - `python2.7`
+- `python3.6`
 
-If you select either of these, bundle-shepherd will build your `.zip` file using its default images and build instructions for that runtime. You may also specify the URI of any other Docker image. If you choose to do so, you will have to also provide your own `buildspec.yml`.
+If you select any of these, bundle-shepherd will build your `.zip` file using its default images and build instructions for that runtime. You may also specify the URI of any other Docker image. If you choose to do so, you will have to also provide your own `buildspec.yml`.
 
 ### size
 
