@@ -263,7 +263,9 @@ const checkRepoOverrides = (options) => {
  */
 const getImageUri = (options) => {
   const defaultImages = {
-    'nodejs6.x': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:nodejs6.x`
+    'nodejs6.x': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:nodejs6.x`,
+    'python2.7': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:python2.7`,
+    'python3.6': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:python3.6`
   };
 
   return defaultImages[options.imageName] || options.imageName;

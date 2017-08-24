@@ -30,3 +30,8 @@ docker push "${uri}:nodejs6.x"
 docker build -t bundle-shepherd:python2.7 -f ./python2.7 ./
 docker tag bundle-shepherd:python2.7 "${uri}:python2.7"
 docker push "${uri}:python2.7"
+
+# Build, tag and push the python3.6 docker image
+docker build -t bundle-shepherd:python3.6 -f ./python3.6 ./
+docker tag bundle-shepherd:python3.6 "${uri}:python3.6"
+docker push "${uri}:python3.6"
