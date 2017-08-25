@@ -4,7 +4,7 @@ const cf = require('@mapbox/cloudfriend');
 const buildWebhook = require('@mapbox/aws-github-webhook');
 
 const Parameters = {
-  GitSha: { Type: 'String', Description: 'Current bundle-shepherd git SHA' },
+  GitSha: { Type: 'String', Description: 'Current stork git SHA' },
   GithubAccessToken: { Type: 'String', Description: '[secure] A Github access token with repo scope' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
   UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'], Description: 'Whether AWS connect to Github via OAuth or via token' },
@@ -27,7 +27,7 @@ const Resources = {
       },
       Policies: [
         {
-          PolicyName: 'bundle-shepherd-projects',
+          PolicyName: 'stork-projects',
           PolicyDocument: {
             Statement: [
               {
@@ -132,11 +132,11 @@ const Resources = {
     Type: 'AWS::Lambda::Function',
     Properties: {
       FunctionName: cf.sub('${AWS::StackName}-trigger'),
-      Description: 'Triggers bundle-shepherd projects',
+      Description: 'Triggers stork projects',
       Role: cf.getAtt('TriggerLambdaRole', 'Arn'),
       Code: {
         S3Bucket: cf.ref('OutputBucket'),
-        S3Key: cf.sub('${OutputPrefix}/bundle-shepherd/${GitSha}.zip')
+        S3Key: cf.sub('${OutputPrefix}/stork/${GitSha}.zip')
       },
       Handler: 'lambda.trigger',
       Runtime: 'nodejs6.10',
@@ -205,11 +205,11 @@ const Resources = {
     Type: 'AWS::Lambda::Function',
     Properties: {
       FunctionName: cf.sub('${AWS::StackName}-status'),
-      Description: 'Reports status on bundle-shepherd projects',
+      Description: 'Reports status on stork projects',
       Role: cf.getAtt('StatusLambdaRole', 'Arn'),
       Code: {
         S3Bucket: cf.ref('OutputBucket'),
-        S3Key: cf.sub('${OutputPrefix}/bundle-shepherd/${GitSha}.zip')
+        S3Key: cf.sub('${OutputPrefix}/stork/${GitSha}.zip')
       },
       Handler: 'lambda.status',
       Runtime: 'nodejs6.10',

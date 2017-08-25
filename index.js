@@ -5,10 +5,10 @@ const AWS = require('aws-sdk');
 const got = require('got');
 
 /**
- * Add a webhook to a Github repository for a single bundle-shepherd region
+ * Add a webhook to a Github repository for a single stork region
  * @param  {Object}  options        - configuration
- * @param  {String}  options.region - the bundle-shepherd region
- * @param  {String}  options.suffix - the bundle-shepherd stack suffix
+ * @param  {String}  options.region - the stork region
+ * @param  {String}  options.suffix - the stork stack suffix
  * @param  {String}  options.token  - github access token
  * @param  {String}  options.org    - github repo's owner
  * @param  {String}  options.repo   - github repo's name
@@ -23,7 +23,7 @@ const setupHook = (options) => {
     const config = {
       json: true,
       headers: {
-        'User-Agent': 'github.com/mapbox/bundle-shepherd',
+        'User-Agent': 'github.com/mapbox/stork',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -42,7 +42,7 @@ const setupHook = (options) => {
     return got.post(`${uri}?${querystring.stringify(query)}`, config);
   };
 
-  return cfn.describeStacks({ StackName: `bundle-shepherd-${options.suffix}` })
+  return cfn.describeStacks({ StackName: `stork-${options.suffix}` })
     .promise()
     .then((data) => {
       const outputs = data.Stacks[0].Outputs;

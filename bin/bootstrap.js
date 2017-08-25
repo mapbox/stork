@@ -13,7 +13,7 @@ const AWS = require('aws-sdk');
 const cli = meow(`
   USAGE: ./bin/bootstrap.js [options]
 
-  Bootstraps bundle-shepherd stacks in a set of AWS regions. All options are not optional.
+  Bootstraps stork stacks in a set of AWS regions. All options are not optional.
 
   OPTIONS:
     -r, --regions           a set of regions to bootstrap
@@ -73,8 +73,8 @@ const uploadBundle = (region, bucket) => {
   const opts = { cwd: path.resolve(__dirname, '..' ) };
 
   return exec('git rev-parse HEAD', opts)
-    .then((gitsha) => exec(`aws s3 cp ./bundle.zip s3://${bucket}/${cli.flags.bundlePrefix}/bundle-shepherd/${gitsha}.zip`))
-    .then(() => console.log(`Uploaded bundle-shepherd code to ${bucket}`));
+    .then((gitsha) => exec(`aws s3 cp ./bundle.zip s3://${bucket}/${cli.flags.bundlePrefix}/stork/${gitsha}.zip`))
+    .then(() => console.log(`Uploaded stork code to ${bucket}`));
 };
 
 const uploadImage = (region) => {
@@ -90,12 +90,12 @@ const deployStack = (region, bucket) => {
 
   return Promise.all([
     exec('git rev-parse HEAD', opts),
-    cf.build(path.resolve(__dirname, '..', 'cloudformation', 'bundle-shepherd.template.js'))
+    cf.build(path.resolve(__dirname, '..', 'cloudformation', 'stork.template.js'))
   ]).then((results) => {
     const gitsha = results[0];
     const template = results[1];
     const params = {
-      StackName: 'bundle-shepherd-production',
+      StackName: 'stork-production',
       Capabilities: ['CAPABILITY_IAM'],
       OnFailure: 'DELETE',
       Parameters: [
@@ -109,7 +109,7 @@ const deployStack = (region, bucket) => {
       TemplateBody: JSON.stringify(template)
     };
     return cfn.createStack(params).promise()
-      .then(() => console.log(`Created bundle-shepherd stack in ${region}`));
+      .then(() => console.log(`Created stork stack in ${region}`));
   });
 };
 

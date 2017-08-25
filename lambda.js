@@ -26,7 +26,7 @@ const projectName = (org, repo, imageUri) => {
   const imageName = imageUri.split('/').pop()
     .replace(/:/g, '_')
     .replace(/\./g, '_')
-    .replace(/bundle-shepherd_/, '');
+    .replace(/stork_/, '');
   return `${org}_${repo}_${imageName}`;
 };
 
@@ -204,7 +204,7 @@ const getFromGithub = (options) => {
 
   const config = {
     json: true,
-    headers: { 'User-Agent': 'github.com/mapbox/bundle-shepherd' }
+    headers: { 'User-Agent': 'github.com/mapbox/stork' }
   };
 
   const uri = `https://api.github.com/repos/${options.org}/${options.repo}/contents/${options.path}`;
@@ -227,7 +227,7 @@ const getFromGithub = (options) => {
 const checkRepoOverrides = (options) => {
   return Promise.all([
     getFromGithub(Object.assign({ path: 'buildspec.yml' }, options)),
-    getFromGithub(Object.assign({ path: '.bundle-shepherd.json' }, options))
+    getFromGithub(Object.assign({ path: '.stork.json' }, options))
   ]).then((data) => {
     const buildspec = data[0];
     let config = data[1];
@@ -263,9 +263,9 @@ const checkRepoOverrides = (options) => {
  */
 const getImageUri = (options) => {
   const defaultImages = {
-    'nodejs6.x': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:nodejs6.x`,
-    'python2.7': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:python2.7`,
-    'python3.6': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/bundle-shepherd:python3.6`
+    'nodejs6.x': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:nodejs6.x`,
+    'python2.7': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:python2.7`,
+    'python3.6': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:python3.6`
   };
 
   return defaultImages[options.imageName] || options.imageName;
@@ -380,7 +380,7 @@ const status = (event, context, callback) => {
 
         const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}?access_token=${token}`;
         const status = {
-          context: 'bundle-shepherd',
+          context: 'stork',
           description: descriptions[phase],
           state: states[phase],
           target_url: logs
@@ -390,7 +390,7 @@ const status = (event, context, callback) => {
           json: true,
           headers: {
             'Content-type': 'application/json',
-            'User-Agent': 'github.com/mapbox/bundle-shepherd'
+            'User-Agent': 'github.com/mapbox/stork'
           },
           body: JSON.stringify(status)
         });
