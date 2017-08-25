@@ -413,4 +413,45 @@ exported.status = (event, context, callback) => {
   });
 };
 
+exported.forwarder = (event, context, callback) => {
+  const buckets = JSON.parse(process.env.BUCKET_REGIONS).map((region) => {
+    return `${process.env.BUCKET_PREFIX}-${region}`;
+  });
+
+  class S3Object {
+    constructor(bucket, key, region) {
+      Object.assign(this, { bucket, key, region });
+      this.client = new AWS.S3({ region });
+    }
+
+    copyTo(dst) {
+      return dst.client.copyObject({
+        CopySource: `/${this.bucket}/${this.key}`,
+        Bucket: dst.bucket,
+        Key: dst.key
+      }).promise();
+    }
+  }
+
+  const clones = event.Records.map((record) => {
+    const src = new S3Object(
+      record.s3.bucket.name,
+      record.s3.object.key,
+      record.awsRegion
+    );
+
+    const dsts = buckets.map((bucket) => new S3Object(
+      bucket,
+      record.s3.object.key,
+      bucket.replace(`${process.env.BUCKET_PREFIX}-`, '')
+    ));
+
+    return Promise.all(dsts.map((dst) => src.copyTo(dst)));
+  });
+
+  Promise.all(clones)
+    .then(() => callback())
+    .catch((err) => callback(err));
+};
+
 module.exports = exported;
