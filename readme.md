@@ -57,7 +57,7 @@ Then, run the bootstrapping script included in this repository:
 ```
 $ git clone https://github.com/mapbox/stork
 $ cd stork
-$ yarn
+$ npm install
 $ ./bin/bootstrap.js \
 >   --regions us-east-1 \
 >   --regions eu-west-1 \

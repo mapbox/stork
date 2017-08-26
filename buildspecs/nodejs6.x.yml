@@ -4,7 +4,7 @@ phases:
     commands:
       - npm install -g decrypt-kms-env
       - eval $(decrypt-kms-env) && echo "//registry.npmjs.org/:_authToken=${NPM_ACCESS_TOKEN}" > .npmrc
-      - if [ -f yarn.lock ]; then yarn install --production; else npm install --production; fi
+      - npm install --production
       - rm -f .npmrc
       - rm -rf .git/
 artifacts:
