@@ -22,6 +22,7 @@ const cli = meow(`
     -g, --github-token      github access token
     -n, --npm-token         npm access token
     -o, --oauth             [false] use OAuth (must already be configured)
+    -k, --kms               [false] use KMS encryption for secure stack parameters
 `, {
   alias: {
     r: 'regions',
@@ -29,13 +30,15 @@ const cli = meow(`
     p: 'bundle-prefix',
     g: 'github-token',
     n: 'npm-token',
-    o: 'oauth'
+    o: 'oauth',
+    k: 'kms'
   },
   string: ['bucket-basename', 'bundle-prefix', 'github-token', 'npm-token'],
   boolean: ['oauth'],
   array: ['regions'],
   default: {
-    oauth: false
+    oauth: false,
+    kms: false
   }
 });
 
@@ -80,20 +83,36 @@ const uploadBundle = (region, bucket) => {
 const uploadImage = (region) => {
   const opts = { cwd: path.resolve(__dirname, '..', 'Dockerfiles') };
 
-  return exec(`./build.sh ${region}`, opts)
+  return exec(`./build.sh ${region} > /dev/null`, opts)
     .then(() => console.log(`Uploaded docker images to ECR in ${region}`));
 };
+
+const encrypt = (client, value) => client.encrypt({
+  KeyId: 'alias/cloudformation',
+  Plaintext: value
+}).promise()
+  .then((data) => `secure:${data.CiphertextBlob.toString('base64')}`);
 
 const deployStack = (region, bucket) => {
   const opts = { cwd: path.resolve(__dirname, '..' ) };
   const cfn = new AWS.CloudFormation({ region });
 
-  return Promise.all([
+  const preamble = [
     exec('git rev-parse HEAD', opts),
     cf.build(path.resolve(__dirname, '..', 'cloudformation', 'stork.template.js'))
-  ]).then((results) => {
+  ];
+
+  if (cli.flags.kms) {
+    const kms = new AWS.KMS({ region });
+    preamble.push(encrypt(kms, cli.flags.npmToken));
+    preamble.push(encrypt(kms, cli.flags.githubToken));
+  }
+
+  return Promise.all(preamble).then((results) => {
     const gitsha = results[0];
     const template = results[1];
+    const encryptedNpm = results[2];
+    const encryptedGithub = results[3];
     const params = {
       StackName: 'stork-production',
       Capabilities: ['CAPABILITY_IAM'],
@@ -101,8 +120,8 @@ const deployStack = (region, bucket) => {
       Parameters: [
         { ParameterKey: 'GitSha', ParameterValue: gitsha },
         { ParameterKey: 'UseOAuth', ParameterValue: cli.flags.oauth.toString() },
-        { ParameterKey: 'NpmAccessToken', ParameterValue: cli.flags.npmToken },
-        { ParameterKey: 'GithubAccessToken', ParameterValue: cli.flags.githubToken },
+        { ParameterKey: 'NpmAccessToken', ParameterValue: encryptedNpm || cli.flags.npmToken },
+        { ParameterKey: 'GithubAccessToken', ParameterValue: encryptedGithub || cli.flags.githubToken },
         { ParameterKey: 'OutputBucket', ParameterValue: bucket },
         { ParameterKey: 'OutputPrefix', ParameterValue: cli.flags.bundlePrefix }
       ],
