@@ -1,6 +1,7 @@
 FROM amazonlinux
 
 RUN yum install -y wget zip
-RUN wget -q https://dl.yarnpkg.com/rpm/yarn.repo -O /etc/yum.repos.d/yarn.repo
-RUN curl --silent --location https://rpm.nodesource.com/setup_6.x | bash -
-RUN yum install -y yarn
+RUN curl -sL https://nodejs.org/dist/v6.11.1/node-v6.11.1-linux-x64.tar.gz | tar zxC /usr/local --strip-components=1
+RUN rm -rf /usr/local/lib/node_modules/npm && \
+  mkdir /usr/local/lib/node_modules/npm && \
+  curl -sL https://github.com/npm/npm/archive/v5.3.0.tar.gz | tar xz -C /usr/local/lib/node_modules/npm --strip-components=1

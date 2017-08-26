@@ -58,7 +58,7 @@ const buildBundle = () => {
   const opts = { cwd: path.resolve(__dirname, '..' ) };
 
   return exec('rm -rf node_modules', opts)
-    .then(() => exec('yarn install --production', opts))
+    .then(() => exec('npm install --production', opts))
     .then(() => exec('rm -f bundle.zip', opts))
     .then(() => exec('zip -r -x \\*.git\\* -q bundle.zip ./', opts));
 };
@@ -68,7 +68,7 @@ const cleanup = () => {
 
   return exec('rm -f bundle.zip', opts)
     .then(() => exec('rm -rf node_modules', opts))
-    .then(() => exec('yarn install', opts))
+    .then(() => exec('npm install', opts))
     .then(() => console.log('Cleaned up working directory'));
 };
 
