@@ -1,5 +1,7 @@
 # stork
 
+[![Build Status](https://travis-ci.org/mapbox/stork.svg?branch=master)](https://travis-ci.org/mapbox/stork)
+
 Another continuous integration system to build Lambda deployment bundles.
 
 # Overview
