@@ -282,27 +282,39 @@ const getDefaultBuildspec = (defaultImage) => {
   return fs.readFileSync(buildspec, 'utf8');
 };
 
-const trigger = (event, context, callback) => {
+const exported = {
+  decrypt: (env) => new Promise((resolve, reject) => {
+    decrypt(env, (err) => {
+      if (err) return reject(err);
+      resolve();
+    });
+  })
+};
+
+exported.trigger = (event, context, callback) => {
   const encryptedNpmToken = process.env.NPM_ACCESS_TOKEN;
 
-  decrypt(process.env, (err) => {
-    if (err) return callback(err);
-
-    const commit = JSON.parse(event.Records[0].Sns.Message);
-    const options = {
-      org: commit.repository.owner.name,
-      repo: commit.repository.name,
-      sha: commit.after,
-      token: process.env.GITHUB_ACCESS_TOKEN,
-      npmToken: encryptedNpmToken,
-      accountId: process.env.AWS_ACCOUNT_ID,
-      region: process.env.AWS_DEFAULT_REGION,
-      bucket: process.env.S3_BUCKET,
-      prefix: process.env.S3_PREFIX,
-      role: process.env.PROJECT_ROLE,
-      status: process.env.STATUS_FUNCTION,
-      oauth: process.env.USE_OAUTH === 'true' ? true : false
-    };
+  exported.decrypt(process.env).then(() => {
+    let commit, options;
+    try {
+      commit = JSON.parse(event.Records[0].Sns.Message);
+      options = {
+        org: commit.repository.owner.name,
+        repo: commit.repository.name,
+        sha: commit.after,
+        token: process.env.GITHUB_ACCESS_TOKEN,
+        npmToken: encryptedNpmToken,
+        accountId: process.env.AWS_ACCOUNT_ID,
+        region: process.env.AWS_DEFAULT_REGION,
+        bucket: process.env.S3_BUCKET,
+        prefix: process.env.S3_PREFIX,
+        role: process.env.PROJECT_ROLE,
+        status: process.env.STATUS_FUNCTION,
+        oauth: process.env.USE_OAUTH === 'true' ? true : false
+      };
+    } catch (err) {
+      return callback(null, `CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
+    }
 
     console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
 
@@ -343,10 +355,8 @@ const trigger = (event, context, callback) => {
   });
 };
 
-const status = (event, context, callback) => {
-  decrypt(process.env, (err) => {
-    if (err) return callback(err);
-
+exported.status = (event, context, callback) => {
+  exported.decrypt(process.env).then(() => {
     const token = process.env.GITHUB_ACCESS_TOKEN;
     const id = event.detail['build-id'];
     const phase = event.detail['build-status'];
@@ -370,7 +380,7 @@ const status = (event, context, callback) => {
       .catch((err) => Traceable.promise(err))
       .then((data) => {
         const build = data.builds[0];
-        if (!build) return callback();
+        if (!build) return;
 
         const logs = build.logs.deepLink;
         const sha = build.sourceVersion;
@@ -403,7 +413,4 @@ const status = (event, context, callback) => {
   });
 };
 
-module.exports = {
-  trigger,
-  status
-};
+module.exports = exported;
