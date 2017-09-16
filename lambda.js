@@ -414,10 +414,6 @@ exported.status = (event, context, callback) => {
 };
 
 exported.forwarder = (event, context, callback) => {
-  const buckets = JSON.parse(process.env.BUCKET_REGIONS).map((region) => {
-    return `${process.env.BUCKET_PREFIX}-${region}`;
-  });
-
   class S3Object {
     constructor(bucket, key, region) {
       Object.assign(this, { bucket, key, region });
@@ -433,23 +429,30 @@ exported.forwarder = (event, context, callback) => {
     }
   }
 
-  const clones = event.Records.map((record) => {
-    const src = new S3Object(
-      record.s3.bucket.name,
-      record.s3.object.key,
-      record.awsRegion
-    );
+  Promise.resolve()
+    .then(() => {
+      const buckets = JSON.parse(process.env.BUCKET_REGIONS).map((region) => {
+        return `${process.env.BUCKET_PREFIX}-${region}`;
+      });
 
-    const dsts = buckets.map((bucket) => new S3Object(
-      bucket,
-      record.s3.object.key,
-      bucket.replace(`${process.env.BUCKET_PREFIX}-`, '')
-    ));
+      const clones = event.Records.map((record) => {
+        const src = new S3Object(
+          record.s3.bucket.name,
+          record.s3.object.key,
+          record.awsRegion
+        );
 
-    return Promise.all(dsts.map((dst) => src.copyTo(dst)));
-  });
+        const dsts = buckets.map((bucket) => new S3Object(
+          bucket,
+          record.s3.object.key,
+          bucket.replace(`${process.env.BUCKET_PREFIX}-`, '')
+        ));
 
-  Promise.all(clones)
+        return Promise.all(dsts.map((dst) => src.copyTo(dst)));
+      });
+
+      return Promise.all(clones);
+    })
     .then(() => callback())
     .catch((err) => callback(err));
 };
