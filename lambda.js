@@ -24,30 +24,31 @@ class Traceable extends Error {
 }
 
 const githubToken = (installationId, privateKey) => {
-  const token = jwt.sign(
-    { iss: installationId },
-    privateKey,
-    {
-      algorithm: 'RS256',
-      expiresIn: '10m'
-    }
-  );
+  return Promise.resolve()
+    .then(() => {
+      const token = jwt.sign(
+        { iss: installationId },
+        privateKey,
+        {
+          algorithm: 'RS256',
+          expiresIn: '10m'
+        }
+      );
 
-  const config = {
-    json: true,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'User-Agent': 'github.com/mapbox/stork',
-      Accept: 'application/vnd.github.machine-man-preview+json'
-    }
-  };
+      const config = {
+        json: true,
+        headers: {
+          'User-Agent': 'github.com/mapbox/stork',
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.machine-man-preview+json'
+        }
+      };
 
-  const uri = `https://api.github.com/installations/${installationId}/access_tokens`;
+      const uri = `https://api.github.com/installations/${installationId}/access_tokens`;
 
-  return got
-    .get(uri, config)
-    .then((data) => data.body)
-    .catch((err) => err);
+      return got.post(uri, config);
+    })
+    .then((data) => data.body.token);
 };
 
 const projectName = (org, repo, imageUri) => {
@@ -220,14 +221,15 @@ const runBuild = (options) => {
  * @param {string} options.path
  */
 const getFromGithub = (options) => {
-  const query = {
-    access_token: options.token,
-    ref: options.sha
-  };
+  const query = { ref: options.sha };
 
   const config = {
     json: true,
-    headers: { 'User-Agent': 'github.com/mapbox/stork' }
+    headers: {
+      'User-Agent': 'github.com/mapbox/stork',
+      Authorization: `token ${options.token}`,
+      Accept: 'application/vnd.github.machine-man-preview+json'
+    }
   };
 
   const uri = `https://api.github.com/repos/${options.org}/${options.repo}/contents/${options.path}`;
@@ -430,7 +432,7 @@ exported.status = (event, context, callback) => {
         const owner = source.pathname.split('/')[1];
         const repo = source.pathname.split('/')[2].replace(/.git$/, '');
 
-        const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}?access_token=${token}`;
+        const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}`;
         const status = {
           context: 'stork',
           description: descriptions[phase],
@@ -442,7 +444,9 @@ exported.status = (event, context, callback) => {
           json: true,
           headers: {
             'Content-type': 'application/json',
-            'User-Agent': 'github.com/mapbox/stork'
+            'User-Agent': 'github.com/mapbox/stork',
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.machine-man-preview+json'
           },
           body: JSON.stringify(status)
         });
