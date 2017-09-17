@@ -23,16 +23,17 @@ class Traceable extends Error {
   }
 }
 
-const githubToken = (installationId, privateKey) => {
+const githubToken = (appId, installationId, privateKey) => {
   return Promise.resolve()
     .then(() => {
       const token = jwt.sign(
-        { iss: installationId },
-        privateKey,
         {
-          algorithm: 'RS256',
-          expiresIn: '10m'
-        }
+          iss: appId,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + (10 * 60)
+        },
+        privateKey,
+        { algorithm: 'RS256' }
       );
 
       const config = {
@@ -45,8 +46,8 @@ const githubToken = (installationId, privateKey) => {
       };
 
       const uri = `https://api.github.com/installations/${installationId}/access_tokens`;
-
-      return got.post(uri, config);
+      return got.get('https://api.github.com/app', config)
+        .then(() => got.post(uri, config));
     })
     .then((data) => data.body.token);
 };
@@ -247,11 +248,12 @@ const getFromGithub = (options) => {
  * @param {string} options.org
  * @param {string} options.repo
  * @param {string} options.sha
- * @param {string} options.installationId
+ * @param {number} options.appId
+ * @param {number} options.installationId
  * @param {string} options.privateKey
  */
 const checkRepoOverrides = (options) => {
-  return githubToken(options.installationId, options.privateKey)
+  return githubToken(options.appId, options.installationId, options.privateKey)
     .then((token) => {
       options = Object.assign({ token }, options);
       return Promise.all([
@@ -326,6 +328,7 @@ exported.trigger = (event, context, callback) => {
   const encryptedNpmToken = process.env.NPM_ACCESS_TOKEN;
 
   exported.decrypt(process.env).then(() => {
+    const appId = Number(process.env.GITHUB_APP_ID);
     const installationId = Number(process.env.GITHUB_APP_INSTALLATION_ID);
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
 
@@ -337,6 +340,7 @@ exported.trigger = (event, context, callback) => {
         repo: commit.repository.name,
         sha: commit.after,
         npmToken: encryptedNpmToken,
+        appId,
         installationId,
         privateKey,
         accountId: process.env.AWS_ACCOUNT_ID,
@@ -391,6 +395,7 @@ exported.trigger = (event, context, callback) => {
 
 exported.status = (event, context, callback) => {
   exported.decrypt(process.env).then(() => {
+    const appId = Number(process.env.GITHUB_APP_ID);
     const installationId = Number(process.env.GITHUB_APP_INSTALLATION_ID);
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
     const id = event.detail['build-id'];
@@ -413,7 +418,7 @@ exported.status = (event, context, callback) => {
     const codebuild = new AWS.CodeBuild();
 
     const requests = [
-      githubToken(installationId, privateKey),
+      githubToken(appId, installationId, privateKey),
       codebuild.batchGetBuilds({ ids: [id] }).promise()
         .catch((err) => Traceable.promise(err))
     ];

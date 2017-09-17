@@ -5,6 +5,7 @@ const buildWebhook = require('@mapbox/aws-github-webhook');
 
 const Parameters = {
   GitSha: { Type: 'String', Description: 'Current stork git SHA' },
+  GithubAppId: { Type: 'String', Description: '[secure] Your Github app ID' },
   GithubAppInstallationId: { Type: 'String', Description: '[secure] The installation ID of your Github app' },
   GithubAppPrivateKey: { Type: 'String', Description: '[secure] A private key for your Github app' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
@@ -145,6 +146,7 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
+          GITHUB_APP_ID: cf.ref('GithubAppId'),
           GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId'),
           GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey'),
           NPM_ACCESS_TOKEN: cf.ref('NpmAccessToken'),
@@ -218,6 +220,7 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
+          GITHUB_APP_ID: cf.ref('GithubAppId'),
           GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId'),
           GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey')
         }
