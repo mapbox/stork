@@ -425,7 +425,11 @@ exported.forwarder = (event, context, callback) => {
         CopySource: `/${this.bucket}/${this.key}`,
         Bucket: dst.bucket,
         Key: dst.key
-      }).promise();
+      }).promise()
+        .catch((err) => {
+          console.log(`Error copying to s3://${dst.bucket}/${dst.key}`);
+          return Promise.reject(err);
+        });
     }
   }
 
