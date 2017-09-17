@@ -8,6 +8,7 @@ const path = require('path');
 const got = require('got');
 const querystring = require('querystring');
 const AWS = require('aws-sdk');
+const jwt = require('jsonwebtoken');
 const decrypt = require('decrypt-kms-env');
 
 class Traceable extends Error {
@@ -21,6 +22,33 @@ class Traceable extends Error {
     return Promise.reject(new Traceable(err));
   }
 }
+
+const githubToken = (installationId, privateKey) => {
+  const token = jwt.sign(
+    { iss: installationId },
+    privateKey,
+    {
+      algorithm: 'RS256',
+      expiresIn: '10m'
+    }
+  );
+
+  const config = {
+    json: true,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'User-Agent': 'github.com/mapbox/stork',
+      Accept: 'application/vnd.github.machine-man-preview+json'
+    }
+  };
+
+  const uri = `https://api.github.com/installations/${installationId}/access_tokens`;
+
+  return got
+    .get(uri, config)
+    .then((data) => data.body)
+    .catch((err) => err);
+};
 
 const projectName = (org, repo, imageUri) => {
   const imageName = imageUri.split('/').pop()
@@ -64,9 +92,7 @@ const findProject = (options) => {
  * @param {string} options.region - for the CodeBuild project
  * @param {string} options.role - ARN for project's IAM role
  * @param {string} options.status - ARN for status Lambda function
- * @param {string} options.token - Github access token
  * @param {string} options.npmToken - encrypted NPM access token
- * @param {boolean} options.oauth
  * @returns {Promise} CodeBuild project information
  */
 const createProject = (options) => {
@@ -76,9 +102,8 @@ const createProject = (options) => {
     serviceRole: options.role,
     source: {
       type: 'GITHUB',
-      location: options.oauth
-        ? `https://github.com/${options.org}/${options.repo}`
-        : `https://${options.token}@github.com/${options.org}/${options.repo}`
+      location: `https://github.com/${options.org}/${options.repo}`,
+      auth: { type: 'OAUTH' }
     },
     artifacts: {
       type: 'S3',
@@ -95,8 +120,6 @@ const createProject = (options) => {
       ]
     }
   };
-
-  if (options.oauth) project.source.auth = { type: 'OAUTH' };
 
   const rule = {
     Name: project.name,
@@ -222,34 +245,40 @@ const getFromGithub = (options) => {
  * @param {string} options.org
  * @param {string} options.repo
  * @param {string} options.sha
- * @param {string} options.token
+ * @param {string} options.installationId
+ * @param {string} options.privateKey
  */
 const checkRepoOverrides = (options) => {
-  return Promise.all([
-    getFromGithub(Object.assign({ path: 'buildspec.yml' }, options)),
-    getFromGithub(Object.assign({ path: '.stork.json' }, options))
-  ]).then((data) => {
-    const buildspec = data[0];
-    let config = data[1];
+  return githubToken(options.installationId, options.privateKey)
+    .then((token) => {
+      options = Object.assign({ token }, options);
+      return Promise.all([
+        getFromGithub(Object.assign({ path: 'buildspec.yml' }, options)),
+        getFromGithub(Object.assign({ path: '.stork.json' }, options))
+      ]);
+    })
+    .then((data) => {
+      const buildspec = data[0];
+      let config = data[1];
 
-    const result = {
-      buildspec: false,
-      image: 'nodejs6.x',
-      size: 'small'
-    };
+      const result = {
+        buildspec: false,
+        image: 'nodejs6.x',
+        size: 'small'
+      };
 
-    if (buildspec.type === 'file') result.buildspec = true;
-    if (config.type === 'file') {
-      config = Buffer.from(config.content, config.encoding).toString('utf8');
-      config = JSON.parse(config);
-      if (config.image) result.image = config.image;
-      if (config.size) result.size = config.size;
-    }
+      if (buildspec.type === 'file') result.buildspec = true;
+      if (config.type === 'file') {
+        config = Buffer.from(config.content, config.encoding).toString('utf8');
+        config = JSON.parse(config);
+        if (config.image) result.image = config.image;
+        if (config.size) result.size = config.size;
+      }
 
-    console.log(`Override result: ${JSON.stringify(result)}`);
+      console.log(`Override result: ${JSON.stringify(result)}`);
 
-    return result;
-  });
+      return result;
+    });
 };
 
 /**
@@ -295,6 +324,9 @@ exported.trigger = (event, context, callback) => {
   const encryptedNpmToken = process.env.NPM_ACCESS_TOKEN;
 
   exported.decrypt(process.env).then(() => {
+    const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
+    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
+
     let commit, options;
     try {
       commit = JSON.parse(event.Records[0].Sns.Message);
@@ -302,15 +334,15 @@ exported.trigger = (event, context, callback) => {
         org: commit.repository.owner.name,
         repo: commit.repository.name,
         sha: commit.after,
-        token: process.env.GITHUB_ACCESS_TOKEN,
         npmToken: encryptedNpmToken,
+        installationId,
+        privateKey,
         accountId: process.env.AWS_ACCOUNT_ID,
         region: process.env.AWS_DEFAULT_REGION,
         bucket: process.env.S3_BUCKET,
         prefix: process.env.S3_PREFIX,
         role: process.env.PROJECT_ROLE,
-        status: process.env.STATUS_FUNCTION,
-        oauth: process.env.USE_OAUTH === 'true' ? true : false
+        status: process.env.STATUS_FUNCTION
       };
     } catch (err) {
       return callback(null, `CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
@@ -357,7 +389,8 @@ exported.trigger = (event, context, callback) => {
 
 exported.status = (event, context, callback) => {
   exported.decrypt(process.env).then(() => {
-    const token = process.env.GITHUB_ACCESS_TOKEN;
+    const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
+    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
     const id = event.detail['build-id'];
     const phase = event.detail['build-status'];
 
@@ -376,9 +409,18 @@ exported.status = (event, context, callback) => {
     };
 
     const codebuild = new AWS.CodeBuild();
-    codebuild.batchGetBuilds({ ids: [id] }).promise()
-      .catch((err) => Traceable.promise(err))
-      .then((data) => {
+
+    const requests = [
+      githubToken(installationId, privateKey),
+      codebuild.batchGetBuilds({ ids: [id] }).promise()
+        .catch((err) => Traceable.promise(err))
+    ];
+
+    Promise.all(requests)
+      .then((results) => {
+        const token = results[0];
+        const data = results[1];
+
         const build = data.builds[0];
         if (!build) return;
 
