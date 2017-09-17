@@ -33,6 +33,12 @@ const statusVars = {
   GITHUB_ACCESS_TOKEN: 'secure:sadlfksdafsdadf'
 };
 
+const forwaderVars = {
+  BUCKET_PREFIX: 'mapbox',
+  BUCKET_REGIONS: 'us-east-1,us-east-2,us-west-2',
+  AWS_DEFAULT_REGION: 'us-east-1'
+};
+
 const fakeDecrypt = (env) => {
   for (const key in env) process.env[key] = env[key].replace('secure:', '');
   return Promise.resolve();
@@ -56,6 +62,18 @@ const fakeStatusEvent = {
     'build-id': 'build-id',
     'build-status': 'SUCCEEDED'
   }
+};
+
+const fakeForwarderEvent = {
+  Records: [
+    {
+      s3: {
+        bucket: { name: 'mapbox-us-east-1' },
+        object: { key: 'bundles/6326c40b6c27c5e6dc3ed2a5d931d7e2bd94b01d.zip' }
+      },
+      awsRegion: 'us-east-1'
+    }
+  ]
 };
 
 test('[lambda] trigger: new project, no overrides', (assert) => {
@@ -722,6 +740,59 @@ test('[lambda] status: success', (assert) => {
     environment.restore();
     lambda.decrypt.restore();
     AWS.CodeBuild.restore();
+    assert.end();
+  });
+});
+
+test('[lambda] forwarder: success', (assert) => {
+  const environment = env(forwaderVars).mock();
+
+  const copy = AWS.stub('S3', 'copyObject', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  lambda.forwarder(fakeForwarderEvent, {}, (err) => {
+    assert.ifError(err, 'success');
+
+    assert.equal(copy.callCount, 2, 'copied to 2 regions, ignoring primary');
+    assert.ok(
+      copy.calledWith({
+        CopySource: '/mapbox-us-east-1/bundles/6326c40b6c27c5e6dc3ed2a5d931d7e2bd94b01d.zip',
+        Bucket: 'mapbox-us-east-2',
+        Key: 'bundles/6326c40b6c27c5e6dc3ed2a5d931d7e2bd94b01d.zip'
+      }),
+      'copied bundle to us-east-2'
+    );
+    assert.ok(
+      copy.calledWith({
+        CopySource: '/mapbox-us-east-1/bundles/6326c40b6c27c5e6dc3ed2a5d931d7e2bd94b01d.zip',
+        Bucket: 'mapbox-us-west-2',
+        Key: 'bundles/6326c40b6c27c5e6dc3ed2a5d931d7e2bd94b01d.zip'
+      }),
+      'copied bundle to us-west-2'
+    );
+
+    environment.restore();
+    AWS.S3.restore();
+    assert.end();
+  });
+});
+
+test('[lambda] forwarder: one-region failure', (assert) => {
+  const environment = env(forwaderVars).mock();
+
+  AWS.stub('S3', 'copyObject', function(params) {
+    if (params.Bucket === 'mapbox-us-east-2')
+      this.request.promise.returns(Promise.resolve());
+    else
+      this.request.promise = () => Promise.reject(new Error('foo'));
+  });
+
+  lambda.forwarder(fakeForwarderEvent, {}, (err) => {
+    assert.equal(err.message, 'foo', 'passes through error, resulting in a lambda retry');
+
+    environment.restore();
+    AWS.S3.restore();
     assert.end();
   });
 });

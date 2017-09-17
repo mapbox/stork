@@ -413,4 +413,53 @@ exported.status = (event, context, callback) => {
   });
 };
 
+exported.forwarder = (event, context, callback) => {
+  class S3Object {
+    constructor(bucket, key, region) {
+      Object.assign(this, { bucket, key, region });
+      this.client = new AWS.S3({ region });
+    }
+
+    copyTo(dst) {
+      return dst.client.copyObject({
+        CopySource: `/${this.bucket}/${this.key}`,
+        Bucket: dst.bucket,
+        Key: dst.key
+      }).promise()
+        .catch((err) => {
+          console.log(`Error copying to s3://${dst.bucket}/${dst.key}`);
+          return Promise.reject(err);
+        });
+    }
+  }
+
+  Promise.resolve()
+    .then(() => {
+      const buckets = process.env.BUCKET_REGIONS
+        .split(/, ?/)
+        .filter((region) => region !== process.env.AWS_DEFAULT_REGION)
+        .map((region) => `${process.env.BUCKET_PREFIX}-${region}`);
+
+      const clones = event.Records.map((record) => {
+        const src = new S3Object(
+          record.s3.bucket.name,
+          record.s3.object.key,
+          record.awsRegion
+        );
+
+        const dsts = buckets.map((bucket) => new S3Object(
+          bucket,
+          record.s3.object.key,
+          bucket.replace(`${process.env.BUCKET_PREFIX}-`, '')
+        ));
+
+        return Promise.all(dsts.map((dst) => src.copyTo(dst)));
+      });
+
+      return Promise.all(clones);
+    })
+    .then(() => callback())
+    .catch((err) => callback(err));
+};
+
 module.exports = exported;

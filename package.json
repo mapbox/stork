@@ -22,6 +22,7 @@
     "@mapbox/mock-aws-sdk-js": "0.0.5",
     "eslint": "^3.19.0",
     "eslint-plugin-node": "^4.2.2",
+    "inquirer": "^3.2.2",
     "meow": "^3.7.0",
     "nyc": "^11.2.1",
     "opener": "^1.4.3",
