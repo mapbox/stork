@@ -431,9 +431,9 @@ exported.forwarder = (event, context, callback) => {
 
   Promise.resolve()
     .then(() => {
-      const buckets = JSON.parse(process.env.BUCKET_REGIONS).map((region) => {
-        return `${process.env.BUCKET_PREFIX}-${region}`;
-      });
+      const buckets = process.env.BUCKET_REGIONS
+        .split(/, ?/)
+        .map((region) => `${process.env.BUCKET_PREFIX}-${region}`);
 
       const clones = event.Records.map((record) => {
         const src = new S3Object(
