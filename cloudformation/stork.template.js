@@ -281,7 +281,7 @@ const Resources = {
   ForwarderLambda: {
     Type: 'AWS::Lambda::Function',
     Properties: {
-      FunctionName: cf.sub('${AWS::StackName}-s3-scattershot'),
+      FunctionName: cf.sub('${AWS::StackName}-forwarder'),
       Description: 'Replicate S3 objects to multiple buckets',
       Code: {
         S3Bucket: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
