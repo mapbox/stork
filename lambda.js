@@ -327,7 +327,7 @@ exported.trigger = (event, context, callback) => {
 
   exported.decrypt(process.env).then(() => {
     const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
-    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
+    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\\\n/g, '\n');
 
     let commit, options;
     try {
@@ -392,7 +392,7 @@ exported.trigger = (event, context, callback) => {
 exported.status = (event, context, callback) => {
   exported.decrypt(process.env).then(() => {
     const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
-    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
+    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\\\n/g, '\n');
     const id = event.detail['build-id'];
     const phase = event.detail['build-status'];
 
