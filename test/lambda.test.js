@@ -22,6 +22,10 @@ const privateKey = fs.readFileSync(path.resolve(
   __dirname, 'fixtures', 'fake.pem'
 ), 'utf8');
 
+// const stringifiedPrivateKey = fs.readFileSync(path.resolve(
+//   __dirname, 'fixtures', 'stringified.pem'
+// ), 'utf8');
+
 const publicKey = fs.readFileSync(path.resolve(
   __dirname, 'fixtures', 'public.pem'
 ), 'utf8');
@@ -30,6 +34,7 @@ const triggerVars = {
   NPM_ACCESS_TOKEN: 'secure:d;alfsksadafwe',
   GITHUB_APP_INSTALLATION_ID: 'secure:1234567',
   GITHUB_APP_PRIVATE_KEY: `secure:${privateKey}`,
+  // GITHUB_APP_PRIVATE_KEY: `secure:${stringifiedPrivateKey}`,
   GITHUB_ACCESS_TOKEN: 'secure:sadlfksdafsdadf',
   AWS_ACCOUNT_ID: '123456789012',
   AWS_DEFAULT_REGION: 'us-east-1',
@@ -88,7 +93,7 @@ const fakeForwarderEvent = {
   ]
 };
 
-test('[lambda] trigger: new project, no overrides', (assert) => {
+test.only('[lambda] trigger: new project, no overrides', (assert) => {
   const environment = env(triggerVars).mock();
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
@@ -142,7 +147,7 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
     const args = got.post.args[0];
     const auth = args[1].headers.Authorization.replace('Bearer ', '');
     const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
-    assert.equal(decoded.iss, '1234567', 'constructed valid jwt token using installationId and privateKey');
+    assert.equal(decoded.iss, 1234567, 'constructed valid jwt token using installationId and privateKey');
 
     delete args[1].headers.Authorization;
     assert.ok(
@@ -797,7 +802,7 @@ test('[lambda] status: success', (assert) => {
     const args = got.post.args[0];
     const auth = args[1].headers.Authorization.replace('Bearer ', '');
     const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
-    assert.equal(decoded.iss, '1234567', 'constructed valid jwt token using installationId and privateKey');
+    assert.equal(decoded.iss, 1234567, 'constructed valid jwt token using installationId and privateKey');
 
     delete args[1].headers.Authorization;
     assert.ok(
