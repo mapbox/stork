@@ -237,7 +237,7 @@ const Resources = {
     Type: 'AWS::Logs::LogGroup',
     Properties: {
       LogGroupName: cf.sub('/aws/lambda/${AWS::StackName}-forwarder'),
-      RetentionPeriodInDays: 14
+      RetentionInDays: 14
     }
   },
   ForwarderLambdaRole: {
@@ -279,7 +279,7 @@ const Resources = {
     }
   },
   ForwarderLambda: {
-    Type: 'AWS::Lambda::Permission',
+    Type: 'AWS::Lambda::Function',
     Properties: {
       FunctionName: cf.sub('${AWS::StackName}-s3-scattershot'),
       Description: 'Replicate S3 objects to multiple buckets',
@@ -305,7 +305,7 @@ const Resources = {
     Properties: {
       Action: 'lambda:InvokeFunction',
       FunctionName: cf.ref('ForwarderLambda'),
-      Principal: { Service: 's3.amazonaws.com' },
+      Principal: 's3.amazonaws.com',
       SourceArn: cf.sub('arn:${AWS::Partition}:s3:::${OutputBucketPrefix}-${AWS::Region}')
     }
   }
