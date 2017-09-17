@@ -433,6 +433,7 @@ exported.forwarder = (event, context, callback) => {
     .then(() => {
       const buckets = process.env.BUCKET_REGIONS
         .split(/, ?/)
+        .filter((region) => region !== process.env.AWS_DEFAULT_REGION)
         .map((region) => `${process.env.BUCKET_PREFIX}-${region}`);
 
       const clones = event.Records.map((record) => {
