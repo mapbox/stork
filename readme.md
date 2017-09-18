@@ -4,8 +4,6 @@
 
 Another continuous integration system to build Lambda deployment bundles.
 
-# Overview
-
 ## About
 
 Stork is a continuous integration system that runs on AWS CodeBuild. Its primary usage is to build `.zip` bundles for use in Lambda functions each time a commit is pushed to a Github repository. It can also be used as a more generic tool for running a CodeBuild project on each commit.
