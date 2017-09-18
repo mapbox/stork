@@ -4,6 +4,7 @@
 
 /* eslint-disable no-console */
 
+const fs = require('fs');
 const cp = require('child_process');
 const path = require('path');
 const meow = require('meow');
@@ -19,33 +20,32 @@ const cli = meow(`
     -r, --regions           a set of regions to bootstrap
     -b, --bucket-basename   the root name of the bucket that will house bundles
     -p, --bundle-prefix     the prefix under which bundles will reside
-    -g, --github-token      github access token
+    -a, --app-id            your Github App's ID
+    -i, --installation-id   your Github App's installation's ID
+    -s, --app-keyfile       path to your App's private key file
     -n, --npm-token         npm access token
-    -o, --oauth             [false] use OAuth (must already be configured)
     -k, --kms               [false] use KMS encryption for secure stack parameters
 `, {
   alias: {
     r: 'regions',
     b: 'bucket-basename',
     p: 'bundle-prefix',
-    g: 'github-token',
+    a: 'app-id',
+    i: 'installation-id',
+    s: 'app-keyfile',
     n: 'npm-token',
-    o: 'oauth',
     k: 'kms'
   },
-  string: ['bucket-basename', 'bundle-prefix', 'github-token', 'npm-token'],
-  boolean: ['oauth'],
+  string: ['bucket-basename', 'bundle-prefix', 'github-token', 'npm-token', 'app-keyfile'],
+  number: ['app-id', 'installation-id'],
+  boolean: ['kms'],
   array: ['regions'],
-  default: {
-    oauth: false,
-    kms: false
-  }
+  default: { kms: false }
 });
 
 const regions = Array.isArray(cli.flags.regions)
   ? cli.flags.regions
   : [cli.flags.regions];
-const buckets = regions.map((region) => `${cli.flags.bucketBasename}-${region}`);
 
 const exec = (cmd, options) => new Promise((resolve, reject) => {
   cp.exec(cmd, options, (err, stdout) => {
@@ -97,6 +97,8 @@ const deployStack = (region, bucket) => {
   const opts = { cwd: path.resolve(__dirname, '..' ) };
   const cfn = new AWS.CloudFormation({ region });
 
+  const privateKey = fs.readFileSync(cli.flags.appKeyfile, 'utf8');
+
   const preamble = [
     exec('git rev-parse HEAD', opts),
     cf.build(path.resolve(__dirname, '..', 'cloudformation', 'stork.template.js'))
@@ -105,7 +107,7 @@ const deployStack = (region, bucket) => {
   if (cli.flags.kms) {
     const kms = new AWS.KMS({ region });
     preamble.push(encrypt(kms, cli.flags.npmToken));
-    preamble.push(encrypt(kms, cli.flags.githubToken));
+    preamble.push(encrypt(kms, privateKey));
   }
 
   return Promise.all(preamble).then((results) => {
@@ -119,11 +121,13 @@ const deployStack = (region, bucket) => {
       OnFailure: 'DELETE',
       Parameters: [
         { ParameterKey: 'GitSha', ParameterValue: gitsha },
-        { ParameterKey: 'UseOAuth', ParameterValue: cli.flags.oauth.toString() },
         { ParameterKey: 'NpmAccessToken', ParameterValue: encryptedNpm || cli.flags.npmToken },
-        { ParameterKey: 'GithubAccessToken', ParameterValue: encryptedGithub || cli.flags.githubToken },
-        { ParameterKey: 'OutputBucket', ParameterValue: bucket },
-        { ParameterKey: 'OutputPrefix', ParameterValue: cli.flags.bundlePrefix }
+        { ParameterKey: 'GithubAppId', ParameterValue: cli.flags.appId },
+        { ParameterKey: 'GithubAppInstallationId', ParameterValue: cli.flags.installationId },
+        { ParameterKey: 'GithubAppPrivateKey', ParameterValue: encryptedGithub || privateKey },
+        { ParameterKey: 'OutputBucketPrefix', ParameterValue: bucket },
+        { ParameterKey: 'OutputKeyPrefix', ParameterValue: cli.flags.bundlePrefix },
+        { ParameterKey: 'OutputBucketRegions', ParameterValue: cli.flags.regions.join(',') }
       ],
       TemplateBody: JSON.stringify(template)
     };
@@ -132,20 +136,15 @@ const deployStack = (region, bucket) => {
   });
 };
 
-const pending = regions.map((region) => uploadImage(region));
+const pending = [uploadImage(regions[0])];
 
-pending.push(buildBundle().then(() => {
-  const uploads = regions.map((region, i) => {
-    const bucket = buckets[i];
-    return uploadBundle(region, bucket);
-  });
-  return Promise.all(uploads);
-}).then(() => cleanup()));
+const bucket = `${cli.flags.bucketBasename}-${regions[0]}`;
 
-Promise.all(pending).then(() => {
-  const stacks = regions.map((region, i) => {
-    const bucket = buckets[i];
-    return deployStack(region, bucket);
-  });
-  return Promise.all(stacks);
-});
+pending.push(
+  buildBundle()
+    .then(() => uploadBundle(regions[0], bucket))
+    .then(() => cleanup())
+);
+
+Promise.all(pending)
+  .then(() => deployStack(regions[0], bucket));
