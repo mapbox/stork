@@ -42,7 +42,6 @@ $ ./bin/hook.js \
 >   --org mapbox \
 >   --repo my-repo \
 >   --token xxx
->   --installation 12345
 ```
 
 **via Node.js**
@@ -55,8 +54,7 @@ const options = {
   suffix: 'production',
   token: 'xxx',
   org: 'mapbox',
-  repo: 'my-repo',
-  installation: 12345
+  repo: 'my-repo'
 };
 
 hook(options)
