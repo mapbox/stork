@@ -14,6 +14,10 @@ const nodejsBuildspec = fs.readFileSync(path.resolve(
   __dirname, '..', 'buildspecs', 'nodejs6.x.yml'
 ), 'utf8');
 
+const nodejs4Buildspec = fs.readFileSync(path.resolve(
+  __dirname, '..', 'buildspecs', 'nodejs4.3.yml'
+), 'utf8');
+
 const pythonBuildspec = fs.readFileSync(path.resolve(
   __dirname, '..', 'buildspecs', 'python2.7.yml'
 ), 'utf8');
@@ -405,7 +409,7 @@ test('[lambda] trigger: existing project, no overrides', (assert) => {
   });
 });
 
-test('[lambda] trigger: new project, image override', (assert) => {
+test('[lambda] trigger: new project, image override [python2.7]', (assert) => {
   const environment = env(triggerVars).mock();
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
@@ -513,6 +517,129 @@ test('[lambda] trigger: new project, image override', (assert) => {
           name: 'abcdefg.zip'
         },
         buildspecOverride: pythonBuildspec
+      }),
+      'runs the expected build'
+    );
+
+    environment.restore();
+    lambda.decrypt.restore();
+    got.get.restore();
+    got.post.restore();
+    AWS.CodeBuild.restore();
+    AWS.CloudWatchLogs.restore();
+    AWS.CloudWatchEvents.restore();
+    assert.end();
+  });
+});
+
+test('[lambda] trigger: new project, image override [nodejs4.3]', (assert) => {
+  const environment = env(triggerVars).mock();
+
+  sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
+
+  sinon.stub(got, 'get').callsFake((uri) => {
+    if (/.stork.json/.test(uri)) return Promise.resolve({
+      body: {
+        type: 'file',
+        content: JSON.stringify({ image: 'nodejs4.3' }),
+        encoding: 'utf8'
+      }
+    });
+    return Promise.reject(new Error('404'));
+  }).onCall(0).callsFake(() => Promise.resolve());
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
+
+  const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
+    this.request.promise.returns(Promise.resolve({
+      projects: []
+    }));
+  });
+
+  const makeLogs = AWS.stub('CloudWatchLogs', 'createLogGroup', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const logRetention = AWS.stub('CloudWatchLogs', 'putRetentionPolicy', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const newProject = AWS.stub('CodeBuild', 'createProject', function() {
+    this.request.promise.returns(Promise.resolve({
+      project: { project: 'data' }
+    }));
+  });
+
+  const rule = AWS.stub('CloudWatchEvents', 'putRule', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const targets = AWS.stub('CloudWatchEvents', 'putTargets', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const runBuild = AWS.stub('CodeBuild', 'startBuild', function() {
+    this.request.promise.returns(Promise.resolve({
+      build: { build: 'data' }
+    }));
+  });
+
+  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+    assert.ifError(err, 'success');
+    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
+
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 1, '1 post request to github api');
+    assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
+    assert.equal(makeLogs.callCount, 1, 'no createLogGroup requests');
+    assert.equal(logRetention.callCount, 1, 'no putRetentionPolicy requests');
+    assert.equal(newProject.callCount, 1, 'no createProject requests');
+    assert.equal(rule.callCount, 1, 'no putRule requests');
+    assert.equal(targets.callCount, 1, 'no putTargets requests');
+    assert.equal(runBuild.callCount, 1, 'one startBuild request');
+
+    assert.ok(
+      newProject.calledWith({
+        name: 'mapbox_stork_nodejs4_3',
+        description: 'Lambda builds for mapbox/stork',
+        serviceRole: 'arn:aws:iam:blah:blah:blah',
+        source: {
+          type: 'GITHUB',
+          location: 'https://github.com/mapbox/stork',
+          auth: { type: 'OAUTH' }
+        },
+        artifacts: {
+          type: 'S3',
+          packaging: 'ZIP',
+          location: 'mapbox-us-east-1',
+          path: 'bundles/stork'
+        },
+        environment: {
+          type: 'LINUX_CONTAINER',
+          image: 'nodejs4.3',
+          computeType: 'BUILD_GENERAL1_SMALL',
+          environmentVariables: [
+            { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
+          ]
+        }
+      }),
+      'created a new project with the appropriate properties'
+    );
+
+    assert.ok(
+      runBuild.calledWith({
+        projectName: 'mapbox_stork_nodejs4_3',
+        sourceVersion: 'abcdefg',
+        artifactsOverride: {
+          type: 'S3',
+          packaging: 'ZIP',
+          location: 'mapbox-us-east-1',
+          path: 'bundles/stork',
+          name: 'abcdefg.zip'
+        },
+        buildspecOverride: nodejs4Buildspec
       }),
       'runs the expected build'
     );
