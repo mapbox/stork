@@ -28,10 +28,9 @@ const publicKey = fs.readFileSync(path.resolve(
 
 const triggerVars = {
   NPM_ACCESS_TOKEN: 'secure:d;alfsksadafwe',
-  GITHUB_APP_ID: 'secure:54321',
-  GITHUB_APP_INSTALLATION_ID: 'secure:1234567',
+  GITHUB_APP_ID: '54321',
+  GITHUB_APP_INSTALLATION_ID: '1234567',
   GITHUB_APP_PRIVATE_KEY: `secure:${privateKey}`,
-  GITHUB_ACCESS_TOKEN: 'secure:sadlfksdafsdadf',
   AWS_ACCOUNT_ID: '123456789012',
   AWS_DEFAULT_REGION: 'us-east-1',
   S3_BUCKET: 'mapbox-us-east-1',
@@ -42,8 +41,8 @@ const triggerVars = {
 };
 
 const statusVars = {
-  GITHUB_APP_ID: 'secure:54321',
-  GITHUB_APP_INSTALLATION_ID: 'secure:1234567',
+  GITHUB_APP_ID: '54321',
+  GITHUB_APP_INSTALLATION_ID: '1234567',
   GITHUB_APP_PRIVATE_KEY: `secure:${privateKey}`
 };
 
@@ -140,7 +139,7 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
     assert.ifError(err, 'success');
     assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
-    assert.equal(process.env.GITHUB_APP_INSTALLATION_ID, '1234567', 'env triggerVars were decrypted');
+    assert.equal(process.env.GITHUB_APP_PRIVATE_KEY, privateKey, 'env triggerVars were decrypted');
 
     assert.equal(got.post.callCount, 1, '1 request for github credentials');
 
@@ -770,7 +769,7 @@ test('[lambda] status: id for non-existent build', (assert) => {
   lambda.status(fakeStatusEvent, {}, (err) => {
     assert.ifError(err, 'successfully ignored');
 
-    assert.equal(process.env.GITHUB_APP_INSTALLATION_ID, '1234567', 'env triggerVars were decrypted');
+    assert.equal(process.env.GITHUB_APP_PRIVATE_KEY, privateKey, 'env triggerVars were decrypted');
 
     assert.equal(getBuild.callCount, 1, 'one batchGetBuilds request');
     assert.ok(
