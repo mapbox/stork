@@ -10,7 +10,6 @@ const got = require('got');
  * @param  {String}  options.region       - the stork region
  * @param  {String}  options.suffix       - the stork stack suffix
  * @param  {String}  options.token        - github access token (repo, admin:repo_hook, user)
- * @param  {String}  options.installation - github app installation
  * @param  {String}  options.org          - github repo's owner
  * @param  {String}  options.repo         - github repo's name
  * @return {Promise}                      - resolves when the hook has been created
@@ -35,7 +34,7 @@ const setupHook = (options) => {
       .then((data) => data.body.id);
   };
 
-  const app = (repoId) => {
+  const app = (repoId, installationId) => {
     const query = { access_token: options.token };
 
     const config = {
@@ -46,7 +45,7 @@ const setupHook = (options) => {
       }
     };
 
-    const uri = `https://api.github.com/user/installations/${options.installation}/repositories/${repoId}`;
+    const uri = `https://api.github.com/user/installations/${installationId}/repositories/${repoId}`;
 
     return got.put(`${uri}?${querystring.stringify(query)}`, config);
   };
@@ -77,9 +76,10 @@ const setupHook = (options) => {
   };
 
   return Promise.all([
-    repo().then((repoId) => app(repoId)),
+    repo(),
     cfn.describeStacks({ StackName: `stork-${options.suffix}` }).promise()
   ]).then((results) => {
+    const repoId = results[0];
     const data = results[1];
 
     const outputs = data.Stacks[0].Outputs;
@@ -89,8 +89,15 @@ const setupHook = (options) => {
     const secret = outputs
       .find((output) => output.OutputKey === 'WebhookSecret')
       .OutputValue;
+    const installationId = outputs
+      .find((output) => output.OutputKey === 'GithubAppInstallationId')
+      .OutputValue;
 
-    return hooks(url, secret);
+
+    return Promise.all([
+      app(repoId, installationId),
+      hooks(url, secret)
+    ]);
   });
 };
 
