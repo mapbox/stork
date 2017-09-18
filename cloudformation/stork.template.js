@@ -5,8 +5,8 @@ const buildWebhook = require('@mapbox/aws-github-webhook');
 
 const Parameters = {
   GitSha: { Type: 'String', Description: 'Current stork git SHA' },
-  GithubAppId: { Type: 'String', Description: '[secure] Your Github app ID' },
-  GithubAppInstallationId: { Type: 'String', Description: '[secure] The installation ID of your Github app' },
+  GithubAppId: { Type: 'String', Description: 'Your Github app ID' },
+  GithubAppInstallationId: { Type: 'String', Description: 'The installation ID of your Github app' },
   GithubAppPrivateKey: { Type: 'String', Description: '[secure] A private key for your Github app' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
   OutputBucketPrefix: { Type: 'String', Description: 'Prefix of bucket name that will house bundles' },
@@ -314,6 +314,10 @@ const Resources = {
   }
 };
 
+const Outputs = {
+  GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') }
+};
+
 const webhook = buildWebhook('TriggerLambda');
 
-module.exports = cf.merge({ Parameters, Resources }, webhook);
+module.exports = cf.merge({ Parameters, Resources, Outputs }, webhook);
