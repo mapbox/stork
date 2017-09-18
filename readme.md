@@ -21,14 +21,19 @@ If you wish, you can use a CLI tool included in this repository to connect your 
 ```
 $ ./bin/hook.js \
 >   --regions us-east-1 \
->   --regions eu-west-1 \
 >   --suffix production \
 >   --org mapbox \
 >   --repo my-repo \
 >   --token xxx
+>   --installation 12345
 ```
 
-The Github token provided here must have the `write:repo_hook` scope. It will only be used once to set up webhooks, and after that you can delete the token if you wish.
+The Github token provided here must have the following scopes:
+- `user`: for adding the repository to your stork github app
+- `repo`: for reading repository data
+- `admin:repo_hook`: for adding the webhook to the repository
+
+The token will only be used once to set up webhooks, and after that you can delete the token if you wish.
 
 This repository also provides similar functionality in a JavaScript API, if you'd like to write code to create these webhooks for you.
 
@@ -40,7 +45,8 @@ const options = {
   suffix: 'production',
   token: 'xxx',
   org: 'mapbox',
-  repo: 'my-repo'
+  repo: 'my-repo',
+  installation: 12345
 };
 
 hook(options).then(() => console.log('Linked to webhooks in us-east-1'));
