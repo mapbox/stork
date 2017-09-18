@@ -19,6 +19,10 @@ test('[setupHook] success', (assert) => {
             {
               OutputKey: 'WebhookSecret',
               OutputValue: 'secret'
+            },
+            {
+              OutputKey: 'GithubAppInstallationId',
+              OutputValue: '54321'
             }
           ]
         }
@@ -34,7 +38,6 @@ test('[setupHook] success', (assert) => {
     region: 'us-east-1',
     suffix: 'staging',
     token: 'xxx',
-    installation: 54321,
     org: 'mapbox',
     repo: 'foobar'
   };
