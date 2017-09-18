@@ -18,14 +18,14 @@ These instructions spell out how to use stork bundles from the application devel
 
 **These actions are performed once for each repository that stork should watch**.
 
-If you wish, you can use a CLI tool included in this repository to connect your repository to your stork webhooks. The following example connects `my-repo` owned by `me` to stork stacks in `us-east-1` and `eu-west-1`:
+If you wish, you can use a CLI tool included in this repository to connect your repository to your stork webhooks. The following example connects `my-repo` owned by `mapbox` to stork stacks in `us-east-1` and `eu-west-1`:
 
 ```
 $ ./bin/hook.js \
 >   --regions us-east-1 \
 >   --regions eu-west-1 \
 >   --suffix production \
->   --org me \
+>   --org mapbox \
 >   --repo my-repo \
 >   --token xxx
 ```
@@ -41,7 +41,7 @@ const options = {
   region: 'us-east-1',
   suffix: 'production',
   token: 'xxx',
-  org: 'me',
+  org: 'mapbox',
   repo: 'my-repo'
 };
 
