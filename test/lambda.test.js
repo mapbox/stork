@@ -6,6 +6,7 @@ const test = require('tape');
 const AWS = require('@mapbox/mock-aws-sdk-js');
 const sinon = require('sinon');
 const got = require('got');
+const jwt = require('jsonwebtoken');
 const env = require('./env');
 const lambda = require('../lambda');
 
@@ -17,8 +18,19 @@ const pythonBuildspec = fs.readFileSync(path.resolve(
   __dirname, '..', 'buildspecs', 'python2.7.yml'
 ), 'utf8');
 
+const privateKey = fs.readFileSync(path.resolve(
+  __dirname, 'fixtures', 'fake.pem'
+), 'utf8');
+
+const publicKey = fs.readFileSync(path.resolve(
+  __dirname, 'fixtures', 'public.pem'
+), 'utf8');
+
 const triggerVars = {
   NPM_ACCESS_TOKEN: 'secure:d;alfsksadafwe',
+  GITHUB_APP_ID: 'secure:54321',
+  GITHUB_APP_INSTALLATION_ID: 'secure:1234567',
+  GITHUB_APP_PRIVATE_KEY: `secure:${privateKey}`,
   GITHUB_ACCESS_TOKEN: 'secure:sadlfksdafsdadf',
   AWS_ACCOUNT_ID: '123456789012',
   AWS_DEFAULT_REGION: 'us-east-1',
@@ -30,7 +42,9 @@ const triggerVars = {
 };
 
 const statusVars = {
-  GITHUB_ACCESS_TOKEN: 'secure:sadlfksdafsdadf'
+  GITHUB_APP_ID: 'secure:54321',
+  GITHUB_APP_INSTALLATION_ID: 'secure:1234567',
+  GITHUB_APP_PRIVATE_KEY: `secure:${privateKey}`
 };
 
 const forwaderVars = {
@@ -81,7 +95,14 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
 
-  sinon.stub(got, 'get').callsFake(() => Promise.reject(new Error('404')));
+  sinon.stub(got, 'get')
+    .onCall(0).callsFake(() => Promise.resolve())
+    .onCall(1).callsFake(() => Promise.reject(new Error('404')))
+    .onCall(2).callsFake(() => Promise.reject(new Error('404')));
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
 
   const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
     this.request.promise.returns(Promise.resolve({ projects: [] }));
@@ -119,25 +140,67 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
     assert.ifError(err, 'success');
     assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
-    assert.equal(process.env.GITHUB_ACCESS_TOKEN, 'sadlfksdafsdadf', 'env triggerVars were decrypted');
+    assert.equal(process.env.GITHUB_APP_INSTALLATION_ID, '1234567', 'env triggerVars were decrypted');
 
-    assert.equal(got.get.callCount, 2, '2 requests to github api');
+    assert.equal(got.post.callCount, 1, '1 request for github credentials');
+
+    const args = JSON.parse(JSON.stringify(got.post.args[0]));
+    const auth = args[1].headers.Authorization.replace('Bearer ', '');
+    const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
+    assert.equal(decoded.iss, 54321, 'constructed valid jwt token using installationId and privateKey');
+
+    delete args[1].headers.Authorization;
+    assert.deepEqual(args, [
+      'https://api.github.com/installations/1234567/access_tokens',
+      {
+        json: true,
+        headers: {
+          'User-Agent': 'github.com/mapbox/stork',
+          Accept: 'application/vnd.github.machine-man-preview+json'
+        }
+      }
+    ], 'made anticipated request for github app credentials');
+
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
     assert.ok(
       got.get.calledWith(
-        'https://api.github.com/repos/mapbox/stork/contents/buildspec.yml?access_token=sadlfksdafsdadf&ref=abcdefg',
+        'https://api.github.com/app',
         {
           json: true,
-          headers: { 'User-Agent': 'github.com/mapbox/stork' }
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: `Bearer ${auth}`
+          }
+        }
+      ),
+      'authenticated as the github app'
+    );
+
+    assert.ok(
+      got.get.calledWith(
+        'https://api.github.com/repos/mapbox/stork/contents/buildspec.yml?ref=abcdefg',
+        {
+          json: true,
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: 'token v1.1f699f1069f60xxx'
+          }
         }
       ),
       'looked for buildspec.yml'
     );
     assert.ok(
       got.get.calledWith(
-        'https://api.github.com/repos/mapbox/stork/contents/.stork.json?access_token=sadlfksdafsdadf&ref=abcdefg',
+        'https://api.github.com/repos/mapbox/stork/contents/.stork.json?ref=abcdefg',
         {
           json: true,
-          headers: { 'User-Agent': 'github.com/mapbox/stork' }
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: 'token v1.1f699f1069f60xxx'
+          }
         }
       ),
       'looked for .stork.json'
@@ -244,6 +307,7 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
     environment.restore();
     lambda.decrypt.restore();
     got.get.restore();
+    got.post.restore();
     AWS.CodeBuild.restore();
     AWS.CloudWatchLogs.restore();
     AWS.CloudWatchEvents.restore();
@@ -257,7 +321,14 @@ test('[lambda] trigger: existing project, no overrides', (assert) => {
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
 
-  sinon.stub(got, 'get').callsFake(() => Promise.reject(new Error('404')));
+  sinon.stub(got, 'get')
+    .onCall(0).callsFake(() => Promise.resolve())
+    .onCall(1).callsFake(() => Promise.reject(new Error('404')))
+    .onCall(2).callsFake(() => Promise.reject(new Error('404')));
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
 
   const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
     this.request.promise.returns(Promise.resolve({
@@ -297,7 +368,8 @@ test('[lambda] trigger: existing project, no overrides', (assert) => {
     assert.ifError(err, 'success');
     assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
-    assert.equal(got.get.callCount, 2, '2 requests to github api');
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 1, '1 post request to github api');
     assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
     assert.equal(makeLogs.callCount, 0, 'no createLogGroup requests');
     assert.equal(logRetention.callCount, 0, 'no putRetentionPolicy requests');
@@ -325,6 +397,7 @@ test('[lambda] trigger: existing project, no overrides', (assert) => {
     environment.restore();
     lambda.decrypt.restore();
     got.get.restore();
+    got.post.restore();
     AWS.CodeBuild.restore();
     AWS.CloudWatchLogs.restore();
     AWS.CloudWatchEvents.restore();
@@ -346,7 +419,11 @@ test('[lambda] trigger: new project, image override', (assert) => {
       }
     });
     return Promise.reject(new Error('404'));
-  });
+  }).onCall(0).callsFake(() => Promise.resolve());
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
 
   const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
     this.request.promise.returns(Promise.resolve({
@@ -386,7 +463,8 @@ test('[lambda] trigger: new project, image override', (assert) => {
     assert.ifError(err, 'success');
     assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
-    assert.equal(got.get.callCount, 2, '2 requests to github api');
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 1, '1 post request to github api');
     assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
     assert.equal(makeLogs.callCount, 1, 'no createLogGroup requests');
     assert.equal(logRetention.callCount, 1, 'no putRetentionPolicy requests');
@@ -442,6 +520,7 @@ test('[lambda] trigger: new project, image override', (assert) => {
     environment.restore();
     lambda.decrypt.restore();
     got.get.restore();
+    got.post.restore();
     AWS.CodeBuild.restore();
     AWS.CloudWatchLogs.restore();
     AWS.CloudWatchEvents.restore();
@@ -470,7 +549,11 @@ test('[lambda] trigger: new project, image, buildspec, size override', (assert) 
       }
     });
     return Promise.reject(new Error('404'));
-  });
+  }).onCall(0).callsFake(() => Promise.resolve());
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
 
   const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
     this.request.promise.returns(Promise.resolve({
@@ -510,7 +593,8 @@ test('[lambda] trigger: new project, image, buildspec, size override', (assert) 
     assert.ifError(err, 'success');
     assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
-    assert.equal(got.get.callCount, 2, '2 requests to github api');
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 1, '1 post request to github api');
     assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
     assert.equal(makeLogs.callCount, 1, 'no createLogGroup requests');
     assert.equal(logRetention.callCount, 1, 'no putRetentionPolicy requests');
@@ -565,6 +649,7 @@ test('[lambda] trigger: new project, image, buildspec, size override', (assert) 
     environment.restore();
     lambda.decrypt.restore();
     got.get.restore();
+    got.post.restore();
     AWS.CodeBuild.restore();
     AWS.CloudWatchLogs.restore();
     AWS.CloudWatchEvents.restore();
@@ -586,7 +671,11 @@ test('[lambda] trigger: existing project, same overrides', (assert) => {
       }
     });
     return Promise.reject(new Error('404'));
-  });
+  }).onCall(0).callsFake(() => Promise.resolve());
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
 
   const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
     this.request.promise.returns(Promise.resolve({
@@ -626,7 +715,8 @@ test('[lambda] trigger: existing project, same overrides', (assert) => {
     assert.ifError(err, 'success');
     assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
-    assert.equal(got.get.callCount, 2, '2 requests to github api');
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 1, '1 post request to github api');
     assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
     assert.equal(makeLogs.callCount, 0, 'no createLogGroup requests');
     assert.equal(logRetention.callCount, 0, 'no putRetentionPolicy requests');
@@ -654,6 +744,7 @@ test('[lambda] trigger: existing project, same overrides', (assert) => {
     environment.restore();
     lambda.decrypt.restore();
     got.get.restore();
+    got.post.restore();
     AWS.CodeBuild.restore();
     AWS.CloudWatchLogs.restore();
     AWS.CloudWatchEvents.restore();
@@ -666,6 +757,12 @@ test('[lambda] status: id for non-existent build', (assert) => {
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
 
+  sinon.stub(got, 'get').callsFake(() => Promise.resolve());
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
+
   const getBuild = AWS.stub('CodeBuild', 'batchGetBuilds', function() {
     this.request.promise.returns(Promise.resolve({ builds: [] }));
   });
@@ -673,7 +770,7 @@ test('[lambda] status: id for non-existent build', (assert) => {
   lambda.status(fakeStatusEvent, {}, (err) => {
     assert.ifError(err, 'successfully ignored');
 
-    assert.equal(process.env.GITHUB_ACCESS_TOKEN, 'sadlfksdafsdadf', 'env triggerVars were decrypted');
+    assert.equal(process.env.GITHUB_APP_INSTALLATION_ID, '1234567', 'env triggerVars were decrypted');
 
     assert.equal(getBuild.callCount, 1, 'one batchGetBuilds request');
     assert.ok(
@@ -683,6 +780,8 @@ test('[lambda] status: id for non-existent build', (assert) => {
 
     environment.restore();
     lambda.decrypt.restore();
+    got.get.restore();
+    got.post.restore();
     AWS.CodeBuild.restore();
     assert.end();
   });
@@ -705,7 +804,13 @@ test('[lambda] status: success', (assert) => {
     }));
   });
 
-  sinon.stub(got, 'post').callsFake(() => Promise.resolve());
+  sinon.stub(got, 'get').callsFake(() => Promise.resolve());
+
+  sinon.stub(got, 'post')
+    .onCall(0).callsFake(() => Promise.resolve({
+      body: { token: 'v1.1f699f1069f60xxx' }
+    }))
+    .onCall(1).callsFake(() => Promise.resolve());
 
   lambda.status(fakeStatusEvent, {}, (err) => {
     assert.ifError(err, 'success');
@@ -716,15 +821,35 @@ test('[lambda] status: success', (assert) => {
       'looks for build by ID in the invocation event'
     );
 
-    assert.equal(got.post.callCount, 1, 'one github api request');
+    assert.equal(got.post.callCount, 2, 'two github post requests');
+
+    const args = JSON.parse(JSON.stringify(got.post.args[0]));
+    const auth = args[1].headers.Authorization.replace('Bearer ', '');
+    const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
+    assert.equal(decoded.iss, 54321, 'constructed valid jwt token using installationId and privateKey');
+
+    delete args[1].headers.Authorization;
+    assert.deepEqual(args, [
+      'https://api.github.com/installations/1234567/access_tokens',
+      {
+        json: true,
+        headers: {
+          'User-Agent': 'github.com/mapbox/stork',
+          Accept: 'application/vnd.github.machine-man-preview+json'
+        }
+      }
+    ], 'made anticipated request for github app credentials');
+
     assert.ok(
       got.post.calledWith(
-        'https://api.github.com/repos/mapbox/stork/statuses/abcdefg?access_token=sadlfksdafsdadf',
+        'https://api.github.com/repos/mapbox/stork/statuses/abcdefg',
         {
           json: true,
           headers: {
             'Content-type': 'application/json',
-            'User-Agent': 'github.com/mapbox/stork'
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: 'token v1.1f699f1069f60xxx'
           },
           body: JSON.stringify({
             context: 'stork',
@@ -737,7 +862,25 @@ test('[lambda] status: success', (assert) => {
       'sets PR status via github api request'
     );
 
+    assert.equal(got.get.callCount, 1, '1 get request to github api');
+    assert.ok(
+      got.get.calledWith(
+        'https://api.github.com/app',
+        {
+          json: true,
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: `Bearer ${auth}`
+          }
+        }
+      ),
+      'authenticated as the github app'
+    );
+
     environment.restore();
+    got.get.restore();
+    got.post.restore();
     lambda.decrypt.restore();
     AWS.CodeBuild.restore();
     assert.end();

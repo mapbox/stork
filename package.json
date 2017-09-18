@@ -33,6 +33,7 @@
   "dependencies": {
     "aws-sdk": "^2.49.0",
     "decrypt-kms-env": "^3.0.0",
-    "got": "^6.7.1"
+    "got": "^6.7.1",
+    "jsonwebtoken": "^8.0.1"
   }
 }

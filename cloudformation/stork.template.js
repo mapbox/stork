@@ -3,12 +3,12 @@
 const cf = require('@mapbox/cloudfriend');
 const buildWebhook = require('@mapbox/aws-github-webhook');
 
-
 const Parameters = {
   GitSha: { Type: 'String', Description: 'Current stork git SHA' },
-  GithubAccessToken: { Type: 'String', Description: '[secure] A Github access token with repo scope' },
+  GithubAppId: { Type: 'String', Description: '[secure] Your Github app ID' },
+  GithubAppInstallationId: { Type: 'String', Description: '[secure] The installation ID of your Github app' },
+  GithubAppPrivateKey: { Type: 'String', Description: '[secure] A private key for your Github app' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
-  UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'], Description: 'Whether AWS connect to Github via OAuth or via token' },
   OutputBucketPrefix: { Type: 'String', Description: 'Prefix of bucket name that will house bundles' },
   OutputBucketRegions: { Type: 'String', Description: 'Regions used as bucket name suffixes' },
   OutputKeyPrefix: { Type: 'String', Description: 'Key prefix within the bucket for bundles' }
@@ -146,8 +146,9 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
-          USE_OAUTH: cf.ref('UseOAuth'),
-          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
+          GITHUB_APP_ID: cf.ref('GithubAppId'),
+          GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId'),
+          GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey'),
           NPM_ACCESS_TOKEN: cf.ref('NpmAccessToken'),
           AWS_ACCOUNT_ID: cf.accountId,
           S3_BUCKET: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
@@ -219,7 +220,9 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
-          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken')
+          GITHUB_APP_ID: cf.ref('GithubAppId'),
+          GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId'),
+          GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey')
         }
       }
     }
