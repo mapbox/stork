@@ -1,15 +1,11 @@
-## The CloudFormation stack
+# Setting up a stork service
 
-You need to set up stork's CloudFormation stack in your AWS account first. This creates a set of resources:
+To use stork, you need to set up stork's CloudFormation stack in your AWS account. This creates a set of resources:
 
 - (API Gateway) A webhook URL and secret: These are how Github will notify stork that a commit has been made.
 - (Lambda) A function to trigger a CodeBuild project that bundles your libraries' code into a `.zip` file and puts it to S3.
 
-If you are interested in putting `.zip` files into buckets in more than one AWS region, you will set up a stork stack in each region.
-
-# Bootstrapping
-
-## Setup the CloudFormation stack
+## Bootstrapping
 
 **These actions only need to be performed once per AWS account**.
 
@@ -42,4 +38,3 @@ This bootstrapping script will perform the following actions for you:
 
 - Build and upload stork's default Docker images to ECR in each region
 - Bundle stork's own code into a `.zip` file and upload it to your buckets in each region
-- Create a CloudFormation stack in each region named `stork-production`
