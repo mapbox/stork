@@ -618,7 +618,7 @@ test('[lambda] trigger: new project, image override [nodejs4.3]', (assert) => {
         },
         environment: {
           type: 'LINUX_CONTAINER',
-          image: 'nodejs4.3',
+          image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/stork:nodejs4.3',
           computeType: 'BUILD_GENERAL1_SMALL',
           environmentVariables: [
             { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
