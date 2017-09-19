@@ -32,7 +32,6 @@ test('[setupHook] success', (assert) => {
 
   sinon.stub(got, 'get').callsFake(() => Promise.resolve({ body: { id: 1234 } }));
   sinon.stub(got, 'put').callsFake(() => Promise.resolve());
-  sinon.stub(got, 'post').callsFake(() => Promise.resolve());
 
   const options = {
     region: 'us-east-1',
@@ -81,37 +80,12 @@ test('[setupHook] success', (assert) => {
         ),
         'added repo to github app installation'
       );
-
-      assert.ok(
-        got.post.calledWith(
-          'https://api.github.com/repos/mapbox/foobar/hooks?access_token=xxx',
-          {
-            json: true,
-            headers: {
-              'User-Agent': 'github.com/mapbox/stork',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              name: 'web',
-              active: true,
-              events: ['push'],
-              config: {
-                url: 'webhook',
-                secret: 'secret',
-                content_type: 'json'
-              }
-            })
-          }
-        ),
-        'properly configured webhook based on cloudformation outputs'
-      );
     })
     .catch((err) => assert.ifError(err, 'failed'))
     .then(() => {
       AWS.CloudFormation.restore();
       got.get.restore();
       got.put.restore();
-      got.post.restore();
       assert.end();
     });
 });
