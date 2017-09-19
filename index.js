@@ -9,7 +9,7 @@ const got = require('got');
  * @param  {Object}  options              - configuration
  * @param  {String}  options.region       - the stork region
  * @param  {String}  options.suffix       - the stork stack suffix
- * @param  {String}  options.token        - github access token (repo, admin:repo_hook, user)
+ * @param  {String}  options.token        - github access token (repo, user)
  * @param  {String}  options.org          - github repo's owner
  * @param  {String}  options.repo         - github repo's name
  * @return {Promise}                      - resolves when the hook has been created
@@ -50,31 +50,6 @@ const setupHook = (options) => {
     return got.put(`${uri}?${querystring.stringify(query)}`, config);
   };
 
-  const hooks = (url, secret) => {
-    const query = { access_token: options.token };
-
-    const config = {
-      json: true,
-      headers: {
-        'User-Agent': 'github.com/mapbox/stork',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: 'web',
-        active: true,
-        events: ['push'],
-        config: {
-          url, secret,
-          content_type: 'json'
-        }
-      })
-    };
-
-    const uri = `https://api.github.com/repos/${options.org}/${options.repo}/hooks`;
-
-    return got.post(`${uri}?${querystring.stringify(query)}`, config);
-  };
-
   return Promise.all([
     repo(),
     cfn.describeStacks({ StackName: `stork-${options.suffix}` }).promise()
@@ -83,21 +58,11 @@ const setupHook = (options) => {
     const data = results[1];
 
     const outputs = data.Stacks[0].Outputs;
-    const url = outputs
-      .find((output) => output.OutputKey === 'WebhookEndpoint')
-      .OutputValue;
-    const secret = outputs
-      .find((output) => output.OutputKey === 'WebhookSecret')
-      .OutputValue;
     const installationId = outputs
       .find((output) => output.OutputKey === 'GithubAppInstallationId')
       .OutputValue;
 
-
-    return Promise.all([
-      app(repoId, installationId),
-      hooks(url, secret)
-    ]);
+    return app(repoId, installationId);
   });
 };
 
