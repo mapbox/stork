@@ -1,96 +1,50 @@
 # stork
 
-Another continuous integration system to build Lambda deployment bundles.
+[![Build Status](https://travis-ci.org/mapbox/stork.svg?branch=master)](https://travis-ci.org/mapbox/stork)
 
-# Overview
+## About
 
-## Concept of a stork
+Stork is a continuous integration system that runs on AWS CodeBuild. Its primary usage is to build `.zip` bundles for use in Lambda functions each time a commit is pushed to a Github repository. It can also be used as a more generic tool for running a CodeBuild project on each commit.
 
-A stork is a continuous integration system that runs on AWS CodeBuild. Its primary usage is to build `.zip` bundles for use in Lambda functions each time a commit is made to a Github repository. It can also be used as a more generic tool for running a CodeBuild project on each commit.
+## Usage
 
-## The CloudFormation stack
+These instructions spell out how to use stork bundles from the application developer's perspective. They depend on there already being a stork stack running in your AWS account. To learn about how to bootstrap a stork stack, please see [these docs instead](./docs/setting-up-a-stork-service.md).
 
-You need to set up stork's CloudFormation stack in your AWS account first. This creates a set of resources:
+### Ask stork to watch your repository
 
-- (API Gateway) A webhook URL and secret: These are how Github will notify stork that a commit has been made.
-- (Lambda) A function to trigger a CodeBuild project that bundles your libraries' code into a `.zip` file and puts it to S3.
+There are several pieces of information that need to be collected prior to configuring a repository to be watched by stork. At Mapbox, we've written an internal CLI tool that knows these values for our account, and configures the repository for our production stork stack. If you're a Mapbox employee, please refer to mbxcli documentation.
 
-If you are interested in putting `.zip` files into buckets in more than one AWS region, you will set up a stork stack in each region.
+Stork provides a Node.js function and a CLI tool that can be used to set this up if you've gathered the following information:
 
-## Configuring a repository
+- **The region** that your account's stork stack runs in
+- **The suffix** of your account's stork stack, as in `the stork-${sufffix} stack`.
+- **Your personal access token** which will be used to make github requests to configure the repository for stork to watch.
+- **The org name** of the repository you wish stork to watch
+- **The repository name** for stork to watch
 
-Once the CloudFormation stack is created, provide its webhook URL and secret to Github as a webhook. This is the only thing you have to do if you simply want to build `.zip` files for node.js 6.10 Lambda functions.
+The Github token provided here must have the following scopes:
+- `user`: for adding the repository to your stork github app
+- `repo`: for reading repository data
+- `admin:repo_hook`: for adding the webhook to the repository
 
-## Overriding defaults
+The token will only be used once to set up webhooks, and after that you can delete the token if you wish.
 
-There are default Docker images and `buildspec.yml` files provided by stork. These are the instructions that CodeBuild needs in order to create the `.zip` files for **a node.js 6.10 Lambda function**. If you want to build a bundle for a different Lambda runtime, or have complex steps that must execute in order to properly build the bundle, you can override stork's defaults by including your own `buildspec.yml` and/or `.stork.json` files in your repository.
+With those information in hand, you can chose to configure stork to watch your repository using either a CLI command or by writing a Node.js script.
 
-## Using the Lambda bundles
+The following examples connects `my-repo` owned by `mapbox` to a `production` stork stack in `us-east-1`:
 
-When setting up the CloudFormation stack, you will specify a bucket name and a prefix under which stork will place `.zip` files. If you specified these as `my-bucket` and `my-bundles`, and you were to make a commit to `my-repo` with a SHA of `abc`, then the bundle will be located at:
-
-```
-s3://my-bucket/my-bundles/my-repo/abc.zip
-```
-
-Each time you make another commit to `my-repo`, another `.zip` file will be written with the commit's SHA. This predictable naming scheme helps you manage Lambda functions defined in CloudFormation templates, where the Lambda function code might change from commit to commit.
-
-# Bootstrapping
-
-## Setup the CloudFormation stack
-
-**These actions only need to be performed once per AWS account**.
-
-To setup stork in your AWS account, first answer the following questions:
-
-- What regions will I want to host `.zip` files in?
-- What are my regional buckets going to be named? **They must share a common basename and end with the region identifier**. For example: `my-bucket-us-east-1`, `my-bucket-eu-west-1`, etc.
-- What prefix will I put bundles under within those buckets?
-
-Once you've made these decisions, you must:
-
-- Create each of those buckets
-- Create a Github token that has access to clone your repositories. This token will be stored by the CloudFormation and used during each build. It must have, at a minimum, the `public_repo` scope. It must have the `repo` scope if stork will be interacting with private repositories.
-
-Then, run the bootstrapping script included in this repository:
-
-```
-$ git clone https://github.com/mapbox/stork
-$ cd stork
-$ npm install
-$ ./bin/bootstrap.js \
->   --regions us-east-1 \
->   --regions eu-west-1 \
->   --bucket-basename my-bucket \
->   --bundle-prefix my-bundles \
->   --token xxx
-```
-
-This bootstrapping script will perform the following actions for you:
-
-- Build and upload stork's default Docker images to ECR in each region
-- Bundle stork's own code into a `.zip` file and upload it to your buckets in each region
-- Create a CloudFormation stack in each region named `stork-production`
-
-## Connecting the webhooks
-
-**These actions are performed once for each repository that stork should watch**.
-
-If you wish, you can use a CLI tool included in this repository to connect your repository to your stork webhooks. The following example connects `my-repo` owned by `me` to stork stacks in `us-east-1` and `eu-west-1`:
+**via CLI**
 
 ```
 $ ./bin/hook.js \
 >   --regions us-east-1 \
->   --regions eu-west-1 \
 >   --suffix production \
->   --org me \
+>   --org mapbox \
 >   --repo my-repo \
 >   --token xxx
 ```
 
-The Github token provided here must have the `write:repo_hook` scope. It will only be used once to set up webhooks, and after that you can delete the token if you wish.
-
-This repository also provides similar functionality in a JavaScript API, if you'd like to write code to create these webhooks for you.
+**via Node.js**
 
 ```js
 const hook = require('stork').setupHook;
@@ -99,55 +53,76 @@ const options = {
   region: 'us-east-1',
   suffix: 'production',
   token: 'xxx',
-  org: 'me',
+  org: 'mapbox',
   repo: 'my-repo'
 };
 
-hook(options).then(() => console.log('Linked to webhooks in us-east-1'));
+hook(options)
+  .then(() => console.log('Linked to webhooks in us-east-1'));
 ```
 
-If you wish to connect to webhooks in more than one region, you must call this function once for each region.
+### Using the Lambda bundles stork created
 
-# Overrides
+A running stork stack is configured to write `.zip` files to a specific S3 bucket and prefix. For example, if the stork stack writes to `my-bucket` and `my-bundles`, and you were to make a commit to `my-repo` with a SHA of `abc`, then the bundle will be located at:
 
-You may override the default settings stork uses to build a node.js 6.10 `.zip` file. You can use to in order to build deployment packages for Python Lambda functions, or further customize the build to do something that has nothing to do with Lambda. You perform overrides by placing either of two files in a repository that stork is watching.
+```
+s3://my-bucket/my-bundles/my-repo/abc.zip
+```
 
-- **.stork.json**: Allows you to choose from a set of images that stork provides, or set the build to use a custom Docker image.
-- **buildspec.yml**: Allows you to determine exactly the build steps performed by CodeBuild after pulling your code.
+Each time you push a commit to `my-repo`, another `.zip` file will be written with the commit's SHA. This predictable naming scheme helps you manage Lambda functions defined in CloudFormation templates, where the Lambda function code might change from commit to commit.
 
-## .stork.json
+### Stork's default environment
+
+By default, stork will try and bundle your application assuming it will be running on a Lambda function on the `nodejs6.10` runtime. If this is true, then no further configuration on your part is required.
+
+**Note**: Stork uses npm v5.3.0 to install your libraries' `--production` dependencies. If your repository includes a `package-lock.json` file, it will be respected during bundling.
+
+### Building a bundle for a different Lambda runtime
+
+There are four base images provided by stork. These correspond directly to Lambda runtime environments and are meant to reproduce that runtime environment.
+
+- `nodejs6.x` (default)
+- `nodejs4.3`
+- `python2.7`
+- `python3.6`
+
+For each of these environments, see the related Dockerfile in the `Dockerfiles` folder for the specifics of the build environment. Furthermore, the respective `.yml` files in the `buildspces` folder define the steps that will be taken to bundle your repository.
+
+If you wish to build bundles for a runtime other than `nodejs6.10`, follow these steps:
+
+1. Include a `.stork.json` file at the top-level of your repository
+2. The file should be a JSON object, and the `image` property should indicate which of the stork images to use.
+
+Here's an example `.stork.json` file to bundle an application intended for the `python2.7` Lambda runtime:
+
+```json
+{
+  "image": "python2.7"
+}
+```
+
+### Deeper customization of the stork build process
+
+You can further override stork to run a customized CodeBuild project on each commit to your repository. This may mean taking additional steps prior to building a Lambda bundle, or you could use stork as a trigger for an entirely different build process using AWS CodeBuild. You can override stork's default procedures by adding either of these files to your repository:
+
+- **.stork.json**: Allows you to choose from a set of images that stork provides, or set the build to use a custom Docker image. Note that the image you choose must be either one of stork's defaults (see above), or any **public** image.
+- **buildspec.yml**: Allows you to determine exactly the build steps performed by CodeBuild after pulling your code. If you put this file in your repository, you will completely override stork's default bundling procedure. You are responsible for making sure that this file uploads any artifacts from the build to S3.
+
+### .stork.json
 
 This file has the following structure:
 
 ```json
 {
-  "image": "image name or full image url",
+  "image": "a stork default image name or the full URI for a public image",
   "size": "one of small, medium, or large"
 }
 ```
 
-Both fields are optional, and if the default values are fine, you need not include this file at all.
+See [the AWS CodeBuild documentation](https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html) for details about the differences between the small, medium, and large build environments.
 
-### image
-
-There are three default images provided by stork:
-
-- `nodejs6.x` (default)
-- `python2.7`
-- `python3.6`
-
-If you select any of these, stork will build your `.zip` file using its default images and build instructions for that runtime. You may also specify the URI of any other Docker image. If you choose to do so, you will have to also provide your own `buildspec.yml`.
-
-### size
-
-One of
-
-- `small` (default)
-- `medium`
-- `large`
-
-These simply determine the amount of compute resource provisioned by CodeBuild in order to perform your build.
-
-## buildspec.yml
+### buildspec.yml
 
 This file, if provided, determines what actions will be taken during a CodeBuild run on each commit. By defining this file in your repository, you take complete control over the CodeBuild actions, and can use it to take whatever build actions you'd like to.
+
+See [the AWS CodeBuild documentation](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html) to understand this file's sytax and capabilities.

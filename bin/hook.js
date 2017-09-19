@@ -23,6 +23,7 @@ const cli = meow(`
     r: 'regions',
     s: 'suffix',
     t: 'token',
+    i: 'installation',
     o: 'org',
     n: 'repo'
   },

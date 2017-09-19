@@ -9,16 +9,31 @@
   "engines": {
     "node": ">=6.0.0"
   },
+  "scripts": {
+    "lint": "eslint bin cloudformation test *.js",
+    "lint-fix": "eslint bin cloudformation test *.js --fix",
+    "check-template": "validate-template cloudformation/stork.template.js",
+    "coverage": "nyc --reporter html tape test/*.test.js && opener coverage/index.html",
+    "test": "tape test/*.test.js | tap-spec"
+  },
   "devDependencies": {
     "@mapbox/aws-github-webhook": "^1.0.0",
     "@mapbox/cloudfriend": "^1.8.1",
+    "@mapbox/mock-aws-sdk-js": "0.0.5",
     "eslint": "^3.19.0",
     "eslint-plugin-node": "^4.2.2",
-    "meow": "^3.7.0"
+    "inquirer": "^3.2.2",
+    "meow": "^3.7.0",
+    "nyc": "^11.2.1",
+    "opener": "^1.4.3",
+    "sinon": "^3.2.1",
+    "tap-spec": "^4.1.1",
+    "tape": "^4.8.0"
   },
   "dependencies": {
     "aws-sdk": "^2.49.0",
     "decrypt-kms-env": "^3.0.0",
-    "got": "^6.7.1"
+    "got": "^6.7.1",
+    "jsonwebtoken": "^8.0.1"
   }
 }

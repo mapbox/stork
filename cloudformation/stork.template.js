@@ -5,11 +5,13 @@ const buildWebhook = require('@mapbox/aws-github-webhook');
 
 const Parameters = {
   GitSha: { Type: 'String', Description: 'Current stork git SHA' },
-  GithubAccessToken: { Type: 'String', Description: '[secure] A Github access token with repo scope' },
+  GithubAppId: { Type: 'String', Description: 'Your Github app ID' },
+  GithubAppInstallationId: { Type: 'String', Description: 'The installation ID of your Github app' },
+  GithubAppPrivateKey: { Type: 'String', Description: '[secure] A private key for your Github app' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
-  UseOAuth: { Type: 'String', AllowedValues: ['true', 'false'], Description: 'Whether AWS connect to Github via OAuth or via token' },
-  OutputBucket: { Type: 'String', Description: 'Bucket to house bundles' },
-  OutputPrefix: { Type: 'String', Description: 'Prefix within bucket for bundles' }
+  OutputBucketPrefix: { Type: 'String', Description: 'Prefix of bucket name that will house bundles' },
+  OutputBucketRegions: { Type: 'String', Description: 'Regions used as bucket name suffixes' },
+  OutputKeyPrefix: { Type: 'String', Description: 'Key prefix within the bucket for bundles' }
 };
 
 const Resources = {
@@ -42,7 +44,7 @@ const Resources = {
               {
                 Effect: 'Allow',
                 Action: 's3:PutObject',
-                Resource: cf.sub('arn:aws:s3:::${OutputBucket}/${OutputPrefix}/*')
+                Resource: cf.sub('arn:aws:s3:::${OutputBucketPrefix}-${AWS::Region}/${OutputKeyPrefix}/*')
               },
               {
                 Effect: 'Allow',
@@ -135,8 +137,8 @@ const Resources = {
       Description: 'Triggers stork projects',
       Role: cf.getAtt('TriggerLambdaRole', 'Arn'),
       Code: {
-        S3Bucket: cf.ref('OutputBucket'),
-        S3Key: cf.sub('${OutputPrefix}/stork/${GitSha}.zip')
+        S3Bucket: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
+        S3Key: cf.sub('${OutputKeyPrefix}/stork/${GitSha}.zip')
       },
       Handler: 'lambda.trigger',
       Runtime: 'nodejs6.10',
@@ -144,12 +146,13 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
-          USE_OAUTH: cf.ref('UseOAuth'),
-          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
+          GITHUB_APP_ID: cf.ref('GithubAppId'),
+          GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId'),
+          GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey'),
           NPM_ACCESS_TOKEN: cf.ref('NpmAccessToken'),
           AWS_ACCOUNT_ID: cf.accountId,
-          S3_BUCKET: cf.ref('OutputBucket'),
-          S3_PREFIX: cf.ref('OutputPrefix'),
+          S3_BUCKET: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
+          S3_PREFIX: cf.ref('OutputKeyPrefix'),
           PROJECT_ROLE: cf.getAtt('ProjectRole', 'Arn'),
           STATUS_FUNCTION: cf.getAtt('StatusLambda', 'Arn')
         }
@@ -208,8 +211,8 @@ const Resources = {
       Description: 'Reports status on stork projects',
       Role: cf.getAtt('StatusLambdaRole', 'Arn'),
       Code: {
-        S3Bucket: cf.ref('OutputBucket'),
-        S3Key: cf.sub('${OutputPrefix}/stork/${GitSha}.zip')
+        S3Bucket: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
+        S3Key: cf.sub('${OutputKeyPrefix}/stork/${GitSha}.zip')
       },
       Handler: 'lambda.status',
       Runtime: 'nodejs6.10',
@@ -217,7 +220,9 @@ const Resources = {
       MemorySize: 512,
       Environment: {
         Variables: {
-          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken')
+          GITHUB_APP_ID: cf.ref('GithubAppId'),
+          GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId'),
+          GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey')
         }
       }
     }
@@ -230,8 +235,89 @@ const Resources = {
       FunctionName: cf.getAtt('StatusLambda', 'Arn'),
       SourceArn: cf.sub('arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/*')
     }
+  },
+  ForwarderLambdaLogs: {
+    Type: 'AWS::Logs::LogGroup',
+    Properties: {
+      LogGroupName: cf.sub('/aws/lambda/${AWS::StackName}-forwarder'),
+      RetentionInDays: 14
+    }
+  },
+  ForwarderLambdaRole: {
+    Type: 'AWS::IAM::Role',
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: 'sts:AssumeRole',
+            Principal: { Service: 'lambda.amazonaws.com' }
+          }
+        ]
+      },
+      Policies: [
+        {
+          PolicyName: 'forward-bundles',
+          PolicyDocument: {
+            Statement: [
+              {
+                Effect: 'Allow',
+                Action: 'logs:*',
+                Resource: cf.getAtt('ForwarderLambdaLogs', 'Arn')
+              },
+              {
+                Effect: 'Allow',
+                Action: 's3:GetObject',
+                Resource: cf.sub('arn:${AWS::Partition}:s3:::${OutputBucketPrefix}-${AWS::Region}/${OutputKeyPrefix}/*')
+              },
+              {
+                Effect: 'Allow',
+                Action: 's3:PutObject',
+                Resource: cf.sub('arn:${AWS::Partition}:s3:::${OutputBucketPrefix}-*-*-*/${OutputKeyPrefix}/*')
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  ForwarderLambda: {
+    Type: 'AWS::Lambda::Function',
+    Properties: {
+      FunctionName: cf.sub('${AWS::StackName}-forwarder'),
+      Description: 'Replicate S3 objects to multiple buckets',
+      Code: {
+        S3Bucket: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
+        S3Key: cf.sub('${OutputKeyPrefix}/stork/${GitSha}.zip')
+      },
+      Runtime: 'nodejs6.10',
+      Timeout: 300,
+      Handler: 'lambda.forwarder',
+      MemorySize: 128,
+      Role: cf.getAtt('ForwarderLambdaRole', 'Arn'),
+      Environment: {
+        Variables: {
+          BUCKET_PREFIX: cf.ref('OutputBucketPrefix'),
+          BUCKET_REGIONS: cf.ref('OutputBucketRegions')
+        }
+      }
+    }
+  },
+  ForwarderLambdaPermission: {
+    Type: 'AWS::Lambda::Permission',
+    Properties: {
+      Action: 'lambda:InvokeFunction',
+      FunctionName: cf.ref('ForwarderLambda'),
+      Principal: 's3.amazonaws.com',
+      SourceArn: cf.sub('arn:${AWS::Partition}:s3:::${OutputBucketPrefix}-${AWS::Region}')
+    }
   }
 };
 
+const Outputs = {
+  GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') }
+};
+
 const webhook = buildWebhook('TriggerLambda');
-module.exports = cf.merge({ Parameters, Resources }, webhook);
+
+module.exports = cf.merge({ Parameters, Resources, Outputs }, webhook);

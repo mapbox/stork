@@ -21,6 +21,11 @@ aws ecr set-repository-policy \
 desc=$(aws ecr describe-repositories --region ${region} --repository-names stork)
 uri=$(node -e "console.log(${desc}.repositories[0].repositoryUri);")
 
+# Build, tag and push the nodejs4.3 docker image
+docker build -t stork:nodejs4.3 -f ./nodejs4.3 ./
+docker tag stork:nodejs4.3 "${uri}:nodejs4.3"
+docker push "${uri}:nodejs4.3"
+
 # Build, tag and push the nodejs6.x docker image
 docker build -t stork:nodejs6.x -f ./nodejs6.x ./
 docker tag stork:nodejs6.x "${uri}:nodejs6.x"
