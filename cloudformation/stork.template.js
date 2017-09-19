@@ -11,10 +11,19 @@ const Parameters = {
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
   OutputBucketPrefix: { Type: 'String', Description: 'Prefix of bucket name that will house bundles' },
   OutputBucketRegions: { Type: 'String', Description: 'Regions used as bucket name suffixes' },
-  OutputKeyPrefix: { Type: 'String', Description: 'Key prefix within the bucket for bundles' }
+  OutputKeyPrefix: { Type: 'String', Description: 'Key prefix within the bucket for bundles' },
+  AlarmEmail: { Type: 'String', Description: 'An email address to receive alarm notifications' }
 };
 
 const Resources = {
+  AlarmSNSTopic: {
+    Type: 'AWS::SNS::Topic',
+    Properties: {
+      Subscription: [
+        { Protocol: 'email', Endpoint: cf.ref('AlarmEmail') }
+      ]
+    }
+  },
   ProjectRole: {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -159,6 +168,20 @@ const Resources = {
       }
     }
   },
+  TriggerLambdaErrorAlarm: {
+    Period: 60,
+    EvaluationPeriods: 1,
+    Statistic: 'Sum',
+    Threshold: 0,
+    ComparisonOperator: 'GreaterThanThreshold',
+    TreatMissingData: 'notBreaching',
+    Namespace: 'AWS/Lambda',
+    Dimensions: [
+      { Name: 'FunctionName', Value: cf.ref('TriggerLambda') }
+    ],
+    MetricName: 'Errors',
+    AlarmActions: [cf.ref('AlarmSNSTopic')]
+  },
   StatusLambdaRole: {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -226,6 +249,20 @@ const Resources = {
         }
       }
     }
+  },
+  StatusLambdaErrorAlarm: {
+    Period: 60,
+    EvaluationPeriods: 5,
+    Statistic: 'Sum',
+    Threshold: 0,
+    ComparisonOperator: 'GreaterThanThreshold',
+    TreatMissingData: 'notBreaching',
+    Namespace: 'AWS/Lambda',
+    Dimensions: [
+      { Name: 'FunctionName', Value: cf.ref('StatusLambda') }
+    ],
+    MetricName: 'Errors',
+    AlarmActions: [cf.ref('AlarmSNSTopic')]
   },
   StatusFunctionPermission: {
     Type: 'AWS::Lambda::Permission',
@@ -302,6 +339,20 @@ const Resources = {
         }
       }
     }
+  },
+  ForwarderLambdaErrorAlarm: {
+    Period: 60,
+    EvaluationPeriods: 5,
+    Statistic: 'Sum',
+    Threshold: 0,
+    ComparisonOperator: 'GreaterThanThreshold',
+    TreatMissingData: 'notBreaching',
+    Namespace: 'AWS/Lambda',
+    Dimensions: [
+      { Name: 'FunctionName', Value: cf.ref('ForwarderLambda') }
+    ],
+    MetricName: 'Errors',
+    AlarmActions: [cf.ref('AlarmSNSTopic')]
   },
   ForwarderLambdaPermission: {
     Type: 'AWS::Lambda::Permission',
