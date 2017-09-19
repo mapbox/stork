@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@mapbox/cloudfriend": "^1.8.1",
-    "@mapbox/hookshot": "^2.1.0",
+    "@mapbox/hookshot": "^3.0.0",
     "@mapbox/mock-aws-sdk-js": "0.0.5",
     "eslint": "^3.19.0",
     "eslint-plugin-node": "^4.2.2",
