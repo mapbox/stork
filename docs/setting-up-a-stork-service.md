@@ -17,6 +17,8 @@ To setup stork in your AWS account, first answer the following questions:
 - What are my regional buckets going to be named? **They must share a common basename and end with the region identifier**. For example: `my-bucket-us-east-1`, `my-bucket-eu-west-1`, etc. You must create each of these buckets in their respective regions.
 - What prefix will I put bundles under within those buckets?
 
+### Create a Github App
+
 You must also create a Github App in your organization's account. This app will be given permission to read files from repositories that stork is watching, and to report on build status via Github's API.
 
 To create a new Github App:
@@ -26,7 +28,7 @@ To create a new Github App:
 3. Provide the app with the following permissions:
   - **Commit statuses**: Read & write
   - **Repository contents**: Read-only
-4. Do not configure any webhooks.
+4. Under the "Repository contents" section, check the box for "Push".
 5. Generate a private key for the app, and save it to a file locally.
 6. Record the new Github App's ID, which is visible on the App listing page.
 7. Next, create an installation of the app in you organization's account. Simply provide a list of repositories in your account that stork will watch. This list can easily have other repositories added to it later.
@@ -78,7 +80,15 @@ This bootstrapping script will perform the following actions for you:
 - Bundle stork's own code into a `.zip` file and upload it to your bucket in the first region you've listed.
 - Create a `stork-production` CloudFormation stack in the first region you've listed.
 
-### Setting up bucket notifications
+### Update the Github app
+
+Now that your stack is deployed, your account has an API Gateway URL and secret that expects to be sent push event notifications from Github. By configuring your Github App with these values, every repository that gets added to your Github App will automatically have its push events forwarded to your stork stack's URL.
+
+1. Look up your stork stack's output values for `WebhookEndpointOutput` and `WebhookSecretOutput`.
+2. Return to https://github.com/organizations/mapbox/settings/apps and open your app.
+3. Enter the values from your stack into the app's "Webhook URL" and "Webhook secret" fields. Save the changes.
+
+### Set up bucket notifications
 
 If you have configured stork to send bundles to multiple regions, you will need to manually set up S3 bucket notifications to fire your stork stack's "forwarder" Lambda function.
 

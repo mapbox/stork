@@ -1,7 +1,7 @@
 'use strict';
 
 const cf = require('@mapbox/cloudfriend');
-const buildWebhook = require('@mapbox/aws-github-webhook');
+const hookshot = require('@mapbox/hookshot');
 
 const Parameters = {
   GitSha: { Type: 'String', Description: 'Current stork git SHA' },
@@ -318,6 +318,6 @@ const Outputs = {
   GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') }
 };
 
-const webhook = buildWebhook('TriggerLambda');
+const webhook = hookshot.github('TriggerLambda');
 
 module.exports = cf.merge({ Parameters, Resources, Outputs }, webhook);
