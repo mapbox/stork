@@ -171,6 +171,7 @@ const Resources = {
   TriggerLambdaErrorAlarm: {
     Type: 'AWS::CloudWatch::Alarm',
     Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-trigger-function-errors'),
       Period: 60,
       EvaluationPeriods: 1,
       Statistic: 'Sum',
@@ -256,6 +257,7 @@ const Resources = {
   StatusLambdaErrorAlarm: {
     Type: 'AWS::CloudWatch::Alarm',
     Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-status-function-errors'),
       Period: 60,
       EvaluationPeriods: 5,
       Statistic: 'Sum',
@@ -349,6 +351,7 @@ const Resources = {
   ForwarderLambdaErrorAlarm: {
     Type: 'AWS::CloudWatch::Alarm',
     Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-forwarder-function-errors'),
       Period: 60,
       EvaluationPeriods: 5,
       Statistic: 'Sum',
