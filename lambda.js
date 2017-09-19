@@ -14,7 +14,8 @@ const decrypt = require('decrypt-kms-env');
 class Traceable extends Error {
   constructor(err) {
     super();
-    Object.assign(this, err);
+    this.message = err.message;
+    this.code = err.code;
     Error.captureStackTrace(this, Traceable);
   }
 
@@ -22,6 +23,8 @@ class Traceable extends Error {
     return Promise.reject(new Traceable(err));
   }
 }
+
+class ExposableError extends Error {}
 
 const githubToken = (appId, installationId, privateKey) => {
   return Promise.resolve()
@@ -207,7 +210,11 @@ const runBuild = (options) => {
 
   const codebuild = new AWS.CodeBuild({ region: options.region });
   return codebuild.startBuild(params).promise()
-    .catch((err) => Traceable.promise(err))
+    .catch((err) => {
+      if (err.code === 'AccountLimitExceededException')
+        return Promise.reject(new ExposableError('You have reached your AWS CodeBuild concurrency limit. Contact AWS to increase this limit.'));
+      return Traceable.promise(err);
+    })
     .then((data) => data.build);
 };
 
@@ -253,36 +260,31 @@ const getFromGithub = (options) => {
  * @param {string} options.privateKey
  */
 const checkRepoOverrides = (options) => {
-  return githubToken(options.appId, options.installationId, options.privateKey)
-    .then((token) => {
-      options = Object.assign({ token }, options);
-      return Promise.all([
-        getFromGithub(Object.assign({ path: 'buildspec.yml' }, options)),
-        getFromGithub(Object.assign({ path: '.stork.json' }, options))
-      ]);
-    })
-    .then((data) => {
-      const buildspec = data[0];
-      let config = data[1];
+  return Promise.all([
+    getFromGithub(Object.assign({ path: 'buildspec.yml' }, options)),
+    getFromGithub(Object.assign({ path: '.stork.json' }, options))
+  ]).then((data) => {
+    const buildspec = data[0];
+    let config = data[1];
 
-      const result = {
-        buildspec: false,
-        image: 'nodejs6.x',
-        size: 'small'
-      };
+    const result = {
+      buildspec: false,
+      image: 'nodejs6.x',
+      size: 'small'
+    };
 
-      if (buildspec.type === 'file') result.buildspec = true;
-      if (config.type === 'file') {
-        config = Buffer.from(config.content, config.encoding).toString('utf8');
-        config = JSON.parse(config);
-        if (config.image) result.image = config.image;
-        if (config.size) result.size = config.size;
-      }
+    if (buildspec.type === 'file') result.buildspec = true;
+    if (config.type === 'file') {
+      config = Buffer.from(config.content, config.encoding).toString('utf8');
+      config = JSON.parse(config);
+      if (config.image) result.image = config.image;
+      if (config.size) result.size = config.size;
+    }
 
-      console.log(`Override result: ${JSON.stringify(result)}`);
+    console.log(`Override result: ${JSON.stringify(result)}`);
 
-      return result;
-    });
+    return result;
+  });
 };
 
 /**
@@ -341,9 +343,6 @@ exported.trigger = (event, context, callback) => {
         repo: commit.repository.name,
         sha: commit.after,
         npmToken: encryptedNpmToken,
-        appId,
-        installationId,
-        privateKey,
         accountId: process.env.AWS_ACCOUNT_ID,
         region: process.env.AWS_DEFAULT_REGION,
         bucket: process.env.S3_BUCKET,
@@ -357,7 +356,11 @@ exported.trigger = (event, context, callback) => {
 
     console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
 
-    return checkRepoOverrides(options)
+    return githubToken(appId, installationId, privateKey)
+      .then((token) => {
+        options.token = token;
+        return checkRepoOverrides(options);
+      })
       .then((config) => {
         options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
         options.size = config.size;
@@ -390,7 +393,31 @@ exported.trigger = (event, context, callback) => {
         return runBuild(options);
       })
       .then((data) => callback(null, data))
-      .catch((err) => callback(err));
+      .catch((err) => {
+        const uri = `https://api.github.com/repos/${options.org}/${options.repo}/statuses/${options.sha}`;
+        const status = {
+          context: 'stork',
+          description: err instanceof ExposableError
+            ? err.message
+            : 'Stork failed to start your build',
+          state: 'failure'
+        };
+
+        const config = {
+          json: true,
+          headers: {
+            'Content-type': 'application/json',
+            'User-Agent': 'github.com/mapbox/stork',
+            Authorization: `token ${options.token}`,
+            Accept: 'application/vnd.github.machine-man-preview+json'
+          },
+          body: JSON.stringify(status)
+        };
+
+        got.post(uri, config)
+          .then(() => callback(err))
+          .catch(() => callback(err));
+      });
   });
 };
 
