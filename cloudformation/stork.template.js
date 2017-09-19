@@ -169,18 +169,21 @@ const Resources = {
     }
   },
   TriggerLambdaErrorAlarm: {
-    Period: 60,
-    EvaluationPeriods: 1,
-    Statistic: 'Sum',
-    Threshold: 0,
-    ComparisonOperator: 'GreaterThanThreshold',
-    TreatMissingData: 'notBreaching',
-    Namespace: 'AWS/Lambda',
-    Dimensions: [
-      { Name: 'FunctionName', Value: cf.ref('TriggerLambda') }
-    ],
-    MetricName: 'Errors',
-    AlarmActions: [cf.ref('AlarmSNSTopic')]
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      Period: 60,
+      EvaluationPeriods: 1,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('TriggerLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
   },
   StatusLambdaRole: {
     Type: 'AWS::IAM::Role',
@@ -251,18 +254,21 @@ const Resources = {
     }
   },
   StatusLambdaErrorAlarm: {
-    Period: 60,
-    EvaluationPeriods: 5,
-    Statistic: 'Sum',
-    Threshold: 0,
-    ComparisonOperator: 'GreaterThanThreshold',
-    TreatMissingData: 'notBreaching',
-    Namespace: 'AWS/Lambda',
-    Dimensions: [
-      { Name: 'FunctionName', Value: cf.ref('StatusLambda') }
-    ],
-    MetricName: 'Errors',
-    AlarmActions: [cf.ref('AlarmSNSTopic')]
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      Period: 60,
+      EvaluationPeriods: 5,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('StatusLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
   },
   StatusFunctionPermission: {
     Type: 'AWS::Lambda::Permission',
@@ -341,18 +347,21 @@ const Resources = {
     }
   },
   ForwarderLambdaErrorAlarm: {
-    Period: 60,
-    EvaluationPeriods: 5,
-    Statistic: 'Sum',
-    Threshold: 0,
-    ComparisonOperator: 'GreaterThanThreshold',
-    TreatMissingData: 'notBreaching',
-    Namespace: 'AWS/Lambda',
-    Dimensions: [
-      { Name: 'FunctionName', Value: cf.ref('ForwarderLambda') }
-    ],
-    MetricName: 'Errors',
-    AlarmActions: [cf.ref('AlarmSNSTopic')]
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      Period: 60,
+      EvaluationPeriods: 5,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('ForwarderLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
   },
   ForwarderLambdaPermission: {
     Type: 'AWS::Lambda::Permission',
