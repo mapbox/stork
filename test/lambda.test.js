@@ -878,6 +878,195 @@ test('[lambda] trigger: existing project, same overrides', (assert) => {
   });
 });
 
+test('[lambda] trigger: rate-limiting failure', (assert) => {
+  const environment = env(triggerVars).mock();
+
+  sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
+
+  sinon.stub(got, 'get')
+    .onCall(0).callsFake(() => Promise.resolve())
+    .onCall(1).callsFake(() => Promise.reject(new Error('404')))
+    .onCall(2).callsFake(() => Promise.reject(new Error('404')));
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
+
+  const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
+    this.request.promise.returns(Promise.resolve({
+      projects: [{ name: 'mapbox_stork_nodejs6_x' }]
+    }));
+  });
+
+  const makeLogs = AWS.stub('CloudWatchLogs', 'createLogGroup', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const logRetention = AWS.stub('CloudWatchLogs', 'putRetentionPolicy', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const newProject = AWS.stub('CodeBuild', 'createProject', function() {
+    this.request.promise.returns(Promise.resolve({
+      project: { project: 'data' }
+    }));
+  });
+
+  const rule = AWS.stub('CloudWatchEvents', 'putRule', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const targets = AWS.stub('CloudWatchEvents', 'putTargets', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const runBuild = AWS.stub('CodeBuild', 'startBuild', function() {
+    const err = new Error('Cannot have more than 20 active builds for the account');
+    err.code = 'AccountLimitExceededException';
+    this.request.promise = () => Promise.reject(err);
+  });
+
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
+    assert.equal(
+      err.message,
+      'You have reached your AWS CodeBuild concurrency limit. Contact AWS to increase this limit.',
+      'passes through error message'
+    );
+
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 2, '2 post requests to github api');
+    assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
+    assert.equal(makeLogs.callCount, 0, 'no createLogGroup requests');
+    assert.equal(logRetention.callCount, 0, 'no putRetentionPolicy requests');
+    assert.equal(newProject.callCount, 0, 'no createProject requests');
+    assert.equal(rule.callCount, 0, 'no putRule requests');
+    assert.equal(targets.callCount, 0, 'no putTargets requests');
+    assert.equal(runBuild.callCount, 1, 'one startBuild request');
+
+    assert.ok(
+      got.post.calledWith(
+        'https://api.github.com/repos/mapbox/stork/statuses/abcdefg',
+        {
+          json: true,
+          headers: {
+            'Content-type': 'application/json',
+            'User-Agent': 'github.com/mapbox/stork',
+            Authorization: 'token v1.1f699f1069f60xxx',
+            Accept: 'application/vnd.github.machine-man-preview+json'
+          },
+          body: JSON.stringify({
+            context: 'stork',
+            description: 'You have reached your AWS CodeBuild concurrency limit. Contact AWS to increase this limit.',
+            state: 'failure'
+          })
+        }
+      ),
+      'sent failed build status update to github'
+    );
+
+    environment.restore();
+    lambda.decrypt.restore();
+    got.get.restore();
+    got.post.restore();
+    AWS.CodeBuild.restore();
+    AWS.CloudWatchLogs.restore();
+    AWS.CloudWatchEvents.restore();
+    assert.end();
+  });
+});
+
+test('[lambda] trigger: unexpected failure', (assert) => {
+  const environment = env(triggerVars).mock();
+
+  sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
+
+  sinon.stub(got, 'get')
+    .onCall(0).callsFake(() => Promise.resolve())
+    .onCall(1).callsFake(() => Promise.reject(new Error('404')))
+    .onCall(2).callsFake(() => Promise.reject(new Error('404')));
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve({
+    body: { token: 'v1.1f699f1069f60xxx' }
+  }));
+
+  const getProject = AWS.stub('CodeBuild', 'batchGetProjects', function() {
+    this.request.promise.returns(Promise.resolve({
+      projects: [{ name: 'mapbox_stork_nodejs6_x' }]
+    }));
+  });
+
+  const makeLogs = AWS.stub('CloudWatchLogs', 'createLogGroup', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const logRetention = AWS.stub('CloudWatchLogs', 'putRetentionPolicy', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const newProject = AWS.stub('CodeBuild', 'createProject', function() {
+    this.request.promise.returns(Promise.resolve({
+      project: { project: 'data' }
+    }));
+  });
+
+  const rule = AWS.stub('CloudWatchEvents', 'putRule', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const targets = AWS.stub('CloudWatchEvents', 'putTargets', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
+
+  const runBuild = AWS.stub('CodeBuild', 'startBuild', function() {
+    const err = new Error('foo');
+    this.request.promise = () => Promise.reject(err);
+  });
+
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
+    assert.equal(err.message, 'foo', 'passes through error message');
+
+    assert.equal(got.get.callCount, 3, '3 get requests to github api');
+    assert.equal(got.post.callCount, 2, '2 post requests to github api');
+    assert.equal(getProject.callCount, 1, 'one batchGetProjects request');
+    assert.equal(makeLogs.callCount, 0, 'no createLogGroup requests');
+    assert.equal(logRetention.callCount, 0, 'no putRetentionPolicy requests');
+    assert.equal(newProject.callCount, 0, 'no createProject requests');
+    assert.equal(rule.callCount, 0, 'no putRule requests');
+    assert.equal(targets.callCount, 0, 'no putTargets requests');
+    assert.equal(runBuild.callCount, 1, 'one startBuild request');
+
+    assert.ok(
+      got.post.calledWith(
+        'https://api.github.com/repos/mapbox/stork/statuses/abcdefg',
+        {
+          json: true,
+          headers: {
+            'Content-type': 'application/json',
+            'User-Agent': 'github.com/mapbox/stork',
+            Authorization: 'token v1.1f699f1069f60xxx',
+            Accept: 'application/vnd.github.machine-man-preview+json'
+          },
+          body: JSON.stringify({
+            context: 'stork',
+            description: 'Stork failed to start your build',
+            state: 'failure'
+          })
+        }
+      ),
+      'sent failed build status update to github, hid error message'
+    );
+
+    environment.restore();
+    lambda.decrypt.restore();
+    got.get.restore();
+    got.post.restore();
+    AWS.CodeBuild.restore();
+    AWS.CloudWatchLogs.restore();
+    AWS.CloudWatchEvents.restore();
+    assert.end();
+  });
+});
+
 test('[lambda] status: id for non-existent build', (assert) => {
   const environment = env(statusVars).mock();
 
