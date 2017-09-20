@@ -473,7 +473,7 @@ exported.status = (event, context, callback) => {
           target_url: logs
         };
 
-        return got.post(uri, {
+        const config = {
           json: true,
           headers: {
             'Content-type': 'application/json',
@@ -482,7 +482,15 @@ exported.status = (event, context, callback) => {
             Accept: 'application/vnd.github.machine-man-preview+json'
           },
           body: JSON.stringify(status)
-        });
+        };
+
+        const sanitized = JSON.parse(JSON.stringify(config));
+        sanitized.headers.Authorization = 'scrubbed';
+        console.log(`POST ${uri}`);
+        console.log(`headers ${JSON.stringify(sanitized.headers)}`);
+        console.log(`body ${sanitized.body}`);
+
+        return got.post(uri, config);
       })
       .then(() => callback())
       .catch((err) => {
