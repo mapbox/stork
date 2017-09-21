@@ -8,6 +8,7 @@ const Parameters = {
   GithubAppId: { Type: 'String', Description: 'Your Github app ID' },
   GithubAppInstallationId: { Type: 'String', Description: 'The installation ID of your Github app' },
   GithubAppPrivateKey: { Type: 'String', Description: '[secure] A private key for your Github app' },
+  GithubAccessToken: { Type: 'String', Description: '[secure] A personal access token that can update Github Apps' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
   OutputBucketPrefix: { Type: 'String', Description: 'Prefix of bucket name that will house bundles' },
   OutputBucketRegions: { Type: 'String', Description: 'Regions used as bucket name suffixes' },
@@ -374,11 +375,87 @@ const Resources = {
       Principal: 's3.amazonaws.com',
       SourceArn: cf.sub('arn:${AWS::Partition}:s3:::${OutputBucketPrefix}-${AWS::Region}')
     }
+  },
+  GatekeeperLambdaLogs: {
+    Type: 'AWS::Logs::LogGroup',
+    Properties: {
+      LogGroupName: cf.sub('/aws/lambda/${AWS::StackName}-gatekeeper'),
+      RetentionInDays: 14
+    }
+  },
+  GatekeeperLambdaRole: {
+    Type: 'AWS::IAM::Role',
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: 'sts:AssumeRole',
+            Principal: { Service: 'lambda.amazonaws.com' }
+          }
+        ]
+      },
+      Policies: [
+        {
+          PolicyName: 'gatekeeper-to-app',
+          PolicyDocument: {
+            Statement: [
+              {
+                Effect: 'Allow',
+                Action: 'logs:*',
+                Resource: cf.getAtt('GatekeeperLambdaLogs', 'Arn')
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  GatekeeperLambda: {
+    Type: 'AWS::Lambda::Function',
+    Properties: {
+      FunctionName: cf.sub('${AWS::StackName}-gatekeeper'),
+      Description: 'Add repositories to Github app',
+      Code: {
+        S3Bucket: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
+        S3Key: cf.sub('${OutputKeyPrefix}/stork/${GitSha}.zip')
+      },
+      Runtime: 'nodejs6.10',
+      Timeout: 300,
+      Handler: 'lambda.gatekeeper',
+      MemorySize: 128,
+      Role: cf.getAtt('GatekeeperLambdaRole', 'Arn'),
+      Environment: {
+        Variables: {
+          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
+          GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId')
+        }
+      }
+    }
+  },
+  GatekeeperLambdaErrorAlarm: {
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-gatekeeper-function-errors'),
+      Period: 60,
+      EvaluationPeriods: 5,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('GatekeeperLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
   }
 };
 
 const Outputs = {
-  GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') }
+  GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') },
+  GatekeeperLambda: { Value: cf.ref('GatekeeperLambda') }
 };
 
 const webhook = hookshot.github('TriggerLambda');
