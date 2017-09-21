@@ -556,7 +556,7 @@ stork.gatekeeper = (event, context, callback) => {
   if (!event.repoId)
     return callback(new Error('repoId not specified'));
 
-  stork.decrypt()
+  stork.decrypt(process.env)
     .then(() => {
       const token = process.env.GITHUB_ACCESS_TOKEN;
       const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
