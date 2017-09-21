@@ -404,6 +404,11 @@ const Resources = {
                 Effect: 'Allow',
                 Action: 'logs:*',
                 Resource: cf.getAtt('GatekeeperLambdaLogs', 'Arn')
+              },
+              {
+                Effect: 'Allow',
+                Action: 'kms:Decrypt',
+                Resource: cf.importValue('cloudformation-kms-production')
               }
             ]
           }
