@@ -330,29 +330,32 @@ const exported = {
 exported.trigger = (event, context, callback) => {
   const encryptedNpmToken = process.env.NPM_ACCESS_TOKEN;
 
+  let commit, options;
+  try {
+    commit = JSON.parse(event.Records[0].Sns.Message);
+    options = {
+      org: commit.repository.owner.name,
+      repo: commit.repository.name,
+      sha: commit.after,
+      npmToken: encryptedNpmToken,
+      accountId: process.env.AWS_ACCOUNT_ID,
+      region: process.env.AWS_DEFAULT_REGION,
+      bucket: process.env.S3_BUCKET,
+      prefix: process.env.S3_PREFIX,
+      role: process.env.PROJECT_ROLE,
+      status: process.env.STATUS_FUNCTION
+    };
+  } catch (err) {
+    return callback(null, `CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
+  }
+
+  if (commit.deleted && commit.after === '0000000000000000000000000000000000000000')
+    return callback(null, 'Ignoring branch deletion event');
+
   exported.decrypt(process.env).then(() => {
     const appId = Number(process.env.GITHUB_APP_ID);
     const installationId = Number(process.env.GITHUB_APP_INSTALLATION_ID);
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
-
-    let commit, options;
-    try {
-      commit = JSON.parse(event.Records[0].Sns.Message);
-      options = {
-        org: commit.repository.owner.name,
-        repo: commit.repository.name,
-        sha: commit.after,
-        npmToken: encryptedNpmToken,
-        accountId: process.env.AWS_ACCOUNT_ID,
-        region: process.env.AWS_DEFAULT_REGION,
-        bucket: process.env.S3_BUCKET,
-        prefix: process.env.S3_PREFIX,
-        role: process.env.PROJECT_ROLE,
-        status: process.env.STATUS_FUNCTION
-      };
-    } catch (err) {
-      return callback(null, `CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
-    }
 
     console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
 
@@ -392,32 +395,31 @@ exported.trigger = (event, context, callback) => {
 
         return runBuild(options);
       })
-      .then((data) => callback(null, data))
-      .catch((err) => {
-        const uri = `https://api.github.com/repos/${options.org}/${options.repo}/statuses/${options.sha}`;
-        const status = {
-          context: 'stork',
-          description: err instanceof ExposableError
-            ? err.message
-            : 'Stork failed to start your build',
-          state: 'failure'
-        };
+      .then((data) => callback(null, data));
+  }).catch((err) => {
+    const uri = `https://api.github.com/repos/${options.org}/${options.repo}/statuses/${options.sha}`;
+    const status = {
+      context: 'stork',
+      description: err instanceof ExposableError
+        ? err.message
+        : 'Stork failed to start your build',
+      state: 'failure'
+    };
 
-        const config = {
-          json: true,
-          headers: {
-            'Content-type': 'application/json',
-            'User-Agent': 'github.com/mapbox/stork',
-            Authorization: `token ${options.token}`,
-            Accept: 'application/vnd.github.machine-man-preview+json'
-          },
-          body: JSON.stringify(status)
-        };
+    const config = {
+      json: true,
+      headers: {
+        'Content-type': 'application/json',
+        'User-Agent': 'github.com/mapbox/stork',
+        Authorization: `token ${options.token}`,
+        Accept: 'application/vnd.github.machine-man-preview+json'
+      },
+      body: JSON.stringify(status)
+    };
 
-        got.post(uri, config)
-          .then(() => callback(err))
-          .catch(() => callback(err));
-      });
+    got.post(uri, config)
+      .then(() => callback(err))
+      .catch(() => callback(err));
   });
 };
 
