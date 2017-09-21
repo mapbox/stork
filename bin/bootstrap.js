@@ -24,6 +24,7 @@ const cli = meow(`
     -i, --installation-id   your Github App's installation's ID
     -s, --app-keyfile       path to your App's private key file
     -n, --npm-token         npm access token
+    -g, --github-token      github access token
     -k, --kms               [false] use KMS encryption for secure stack parameters
 `, {
   alias: {
@@ -34,6 +35,7 @@ const cli = meow(`
     i: 'installation-id',
     s: 'app-keyfile',
     n: 'npm-token',
+    g: 'github-token',
     k: 'kms'
   },
   string: ['bucket-basename', 'bundle-prefix', 'github-token', 'npm-token', 'app-keyfile'],
@@ -108,6 +110,7 @@ const deployStack = (region, bucket) => {
     const kms = new AWS.KMS({ region });
     preamble.push(encrypt(kms, cli.flags.npmToken));
     preamble.push(encrypt(kms, privateKey));
+    preamble.push(encrypt(kms, cli.flags.githubToken));
   }
 
   return Promise.all(preamble).then((results) => {
@@ -115,6 +118,7 @@ const deployStack = (region, bucket) => {
     const template = results[1];
     const encryptedNpm = results[2];
     const encryptedGithub = results[3];
+    const encryptedGithubToken = results[4];
     const params = {
       StackName: 'stork-production',
       Capabilities: ['CAPABILITY_IAM'],
@@ -125,6 +129,7 @@ const deployStack = (region, bucket) => {
         { ParameterKey: 'GithubAppId', ParameterValue: cli.flags.appId },
         { ParameterKey: 'GithubAppInstallationId', ParameterValue: cli.flags.installationId },
         { ParameterKey: 'GithubAppPrivateKey', ParameterValue: encryptedGithub || privateKey },
+        { ParameterKey: 'GithubAccessToken', ParameterValue: encryptedGithubToken || cli.flags.githubToken },
         { ParameterKey: 'OutputBucketPrefix', ParameterValue: bucket },
         { ParameterKey: 'OutputKeyPrefix', ParameterValue: cli.flags.bundlePrefix },
         { ParameterKey: 'OutputBucketRegions', ParameterValue: cli.flags.regions.join(',') }
