@@ -318,7 +318,7 @@ const getDefaultBuildspec = (defaultImage) => {
   return fs.readFileSync(buildspec, 'utf8');
 };
 
-const exported = {
+const stork = {
   decrypt: (env) => new Promise((resolve, reject) => {
     decrypt(env, (err) => {
       if (err) return reject(err);
@@ -327,102 +327,111 @@ const exported = {
   })
 };
 
-exported.trigger = (event, context, callback) => {
+stork.trigger = (event, context, callback) => {
   const encryptedNpmToken = process.env.NPM_ACCESS_TOKEN;
 
-  exported.decrypt(process.env).then(() => {
-    const appId = Number(process.env.GITHUB_APP_ID);
-    const installationId = Number(process.env.GITHUB_APP_INSTALLATION_ID);
-    const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
+  let commit, options;
+  try {
+    commit = JSON.parse(event.Records[0].Sns.Message);
+    options = {
+      org: commit.repository.owner.name,
+      repo: commit.repository.name,
+      sha: commit.after,
+      npmToken: encryptedNpmToken,
+      accountId: process.env.AWS_ACCOUNT_ID,
+      region: process.env.AWS_DEFAULT_REGION,
+      bucket: process.env.S3_BUCKET,
+      prefix: process.env.S3_PREFIX,
+      role: process.env.PROJECT_ROLE,
+      status: process.env.STATUS_FUNCTION
+    };
+  } catch (err) {
+    console.log(`CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
+    return callback();
+  }
 
-    let commit, options;
-    try {
-      commit = JSON.parse(event.Records[0].Sns.Message);
-      options = {
-        org: commit.repository.owner.name,
-        repo: commit.repository.name,
-        sha: commit.after,
-        npmToken: encryptedNpmToken,
-        accountId: process.env.AWS_ACCOUNT_ID,
-        region: process.env.AWS_DEFAULT_REGION,
-        bucket: process.env.S3_BUCKET,
-        prefix: process.env.S3_PREFIX,
-        role: process.env.PROJECT_ROLE,
-        status: process.env.STATUS_FUNCTION
+  if (commit.deleted && commit.after === '0000000000000000000000000000000000000000') {
+    console.log('Ignoring branch deletion event');
+    return callback();
+  }
+
+  stork.decrypt(process.env)
+    .then(() => {
+      const appId = Number(process.env.GITHUB_APP_ID);
+      const installationId = Number(process.env.GITHUB_APP_INSTALLATION_ID);
+      const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
+
+      console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
+
+      return githubToken(appId, installationId, privateKey)
+        .then((token) => {
+          options.token = token;
+          return checkRepoOverrides(options);
+        })
+        .then((config) => {
+          options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
+          options.size = config.size;
+
+          console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.imageUri}`);
+
+          return Promise.all([config, findProject(options)]);
+        })
+        .then((results) => {
+          const config = results[0];
+          const project = results[1];
+
+          console.log(project
+            ? 'Found existing project'
+            : 'Creating a new project'
+          );
+
+          return Promise.all([
+            config,
+            project ? project : createProject(options)
+          ]);
+        })
+        .then((results) => {
+          const config = results[0];
+          if (!config.buildspec)
+            options.buildspec = getDefaultBuildspec(config.image);
+
+          console.log(`Running a build for ${options.org}/${options.repo}@${options.sha}`);
+
+          return runBuild(options);
+        })
+        .then(() => callback());
+    })
+    .catch((err) => {
+      if (!options.token) return callback(err);
+
+      const uri = `https://api.github.com/repos/${options.org}/${options.repo}/statuses/${options.sha}`;
+      const status = {
+        context: 'stork',
+        description: err instanceof ExposableError
+          ? err.message
+          : 'Stork failed to start your build',
+        state: 'failure'
       };
-    } catch (err) {
-      return callback(null, `CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
-    }
 
-    console.log(`Looking for repo overrides in ${options.org}/${options.repo}@${options.sha}`);
+      const config = {
+        json: true,
+        headers: {
+          'Content-type': 'application/json',
+          'User-Agent': 'github.com/mapbox/stork',
+          Authorization: `token ${options.token}`,
+          Accept: 'application/vnd.github.machine-man-preview+json'
+        },
+        body: JSON.stringify(status)
+      };
 
-    return githubToken(appId, installationId, privateKey)
-      .then((token) => {
-        options.token = token;
-        return checkRepoOverrides(options);
-      })
-      .then((config) => {
-        options.imageUri = getImageUri(Object.assign({ imageName: config.image }, options));
-        options.size = config.size;
-
-        console.log(`Looking for existing project for ${options.org}/${options.repo} using image ${options.imageUri}`);
-
-        return Promise.all([config, findProject(options)]);
-      })
-      .then((results) => {
-        const config = results[0];
-        const project = results[1];
-
-        console.log(project
-          ? 'Found existing project'
-          : 'Creating a new project'
-        );
-
-        return Promise.all([
-          config,
-          project ? project : createProject(options)
-        ]);
-      })
-      .then((results) => {
-        const config = results[0];
-        if (!config.buildspec)
-          options.buildspec = getDefaultBuildspec(config.image);
-
-        console.log(`Running a build for ${options.org}/${options.repo}@${options.sha}`);
-
-        return runBuild(options);
-      })
-      .then((data) => callback(null, data))
-      .catch((err) => {
-        const uri = `https://api.github.com/repos/${options.org}/${options.repo}/statuses/${options.sha}`;
-        const status = {
-          context: 'stork',
-          description: err instanceof ExposableError
-            ? err.message
-            : 'Stork failed to start your build',
-          state: 'failure'
-        };
-
-        const config = {
-          json: true,
-          headers: {
-            'Content-type': 'application/json',
-            'User-Agent': 'github.com/mapbox/stork',
-            Authorization: `token ${options.token}`,
-            Accept: 'application/vnd.github.machine-man-preview+json'
-          },
-          body: JSON.stringify(status)
-        };
-
-        got.post(uri, config)
-          .then(() => callback(err))
-          .catch(() => callback(err));
-      });
-  });
+      got.post(uri, config)
+        .then(() => callback(err))
+        .catch(() => callback(err));
+    });
 };
 
-exported.status = (event, context, callback) => {
-  exported.decrypt(process.env).then(() => {
+stork.status = (event, context, callback) => {
+  stork.decrypt(process.env).then(() => {
     const appId = Number(process.env.GITHUB_APP_ID);
     const installationId = Number(process.env.GITHUB_APP_INSTALLATION_ID);
     const privateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
@@ -473,7 +482,7 @@ exported.status = (event, context, callback) => {
           target_url: logs
         };
 
-        return got.post(uri, {
+        const config = {
           json: true,
           headers: {
             'Content-type': 'application/json',
@@ -482,7 +491,9 @@ exported.status = (event, context, callback) => {
             Accept: 'application/vnd.github.machine-man-preview+json'
           },
           body: JSON.stringify(status)
-        });
+        };
+
+        return got.post(uri, config);
       })
       .then(() => callback())
       .catch((err) => {
@@ -492,7 +503,7 @@ exported.status = (event, context, callback) => {
   });
 };
 
-exported.forwarder = (event, context, callback) => {
+stork.forwarder = (event, context, callback) => {
   class S3Object {
     constructor(bucket, key, region) {
       Object.assign(this, { bucket, key, region });
@@ -541,4 +552,4 @@ exported.forwarder = (event, context, callback) => {
     .catch((err) => callback(err));
 };
 
-module.exports = exported;
+module.exports = stork;
