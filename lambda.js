@@ -346,11 +346,14 @@ stork.trigger = (event, context, callback) => {
       status: process.env.STATUS_FUNCTION
     };
   } catch (err) {
-    return callback(null, `CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
+    console.log(`CANNOT PARSE ${err.message}: ${JSON.stringify(event)}`);
+    return callback();
   }
 
-  if (commit.deleted && commit.after === '0000000000000000000000000000000000000000')
-    return callback(null, 'Ignoring branch deletion event');
+  if (commit.deleted && commit.after === '0000000000000000000000000000000000000000') {
+    console.log('Ignoring branch deletion event');
+    return callback();
+  }
 
   stork.decrypt(process.env)
     .then(() => {
@@ -396,7 +399,7 @@ stork.trigger = (event, context, callback) => {
 
           return runBuild(options);
         })
-        .then((data) => callback(null, data));
+        .then(() => callback());
     })
     .catch((err) => {
       if (!options.token) return callback(err);

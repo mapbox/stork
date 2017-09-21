@@ -1,5 +1,7 @@
 'use strict';
 
+/* eslint-disable no-console */
+
 const fs = require('fs');
 const path = require('path');
 const test = require('tape');
@@ -93,6 +95,24 @@ const fakeForwarderEvent = {
   ]
 };
 
+test('[lambda] trigger: faillure to parse event', (assert) => {
+  const event = 'not gonna happen';
+
+  sinon.spy(console, 'log');
+
+  lambda.trigger(event, {}, (err) => {
+    assert.ifError(err, 'no error, event is ignored');
+
+    assert.ok(
+      console.log.calledWith('CANNOT PARSE Cannot read property \'0\' of undefined: "not gonna happen"'),
+      'logs failure to parse event'
+    );
+
+    console.log.restore();
+    assert.end();
+  });
+});
+
 test('[lamdba] trigger: ignore events representing branch deletion', (assert) => {
   const event = {
     Records: [
@@ -111,9 +131,12 @@ test('[lamdba] trigger: ignore events representing branch deletion', (assert) =>
     ]
   };
 
-  lambda.trigger(event, {}, (err, result) => {
+  sinon.spy(console, 'log');
+
+  lambda.trigger(event, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.equal(result, 'Ignoring branch deletion event', 'logs info that an event was ignored');
+    assert.ok(console.log.calledWith('Ignoring branch deletion event'), 'logs info that an event was ignored');
+    console.log.restore();
     assert.end();
   });
 });
@@ -180,9 +203,8 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
     }));
   });
 
-  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
     assert.equal(process.env.GITHUB_APP_PRIVATE_KEY, privateKey, 'env triggerVars were decrypted');
 
@@ -408,9 +430,8 @@ test('[lambda] trigger: existing project, no overrides', (assert) => {
     }));
   });
 
-  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
     assert.equal(got.get.callCount, 3, '3 get requests to github api');
     assert.equal(got.post.callCount, 1, '1 post request to github api');
@@ -503,9 +524,8 @@ test('[lambda] trigger: new project, image override [python2.7]', (assert) => {
     }));
   });
 
-  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
     assert.equal(got.get.callCount, 3, '3 get requests to github api');
     assert.equal(got.post.callCount, 1, '1 post request to github api');
@@ -626,9 +646,8 @@ test('[lambda] trigger: new project, image override [nodejs4.3]', (assert) => {
     }));
   });
 
-  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
     assert.equal(got.get.callCount, 3, '3 get requests to github api');
     assert.equal(got.post.callCount, 1, '1 post request to github api');
@@ -756,9 +775,8 @@ test('[lambda] trigger: new project, image, buildspec, size override', (assert) 
     }));
   });
 
-  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
     assert.equal(got.get.callCount, 3, '3 get requests to github api');
     assert.equal(got.post.callCount, 1, '1 post request to github api');
@@ -878,9 +896,8 @@ test('[lambda] trigger: existing project, same overrides', (assert) => {
     }));
   });
 
-  lambda.trigger(fakeTriggerEvent, {}, (err, result) => {
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
     assert.ifError(err, 'success');
-    assert.deepEqual(result, { build: 'data' }, 'callback logs build data');
 
     assert.equal(got.get.callCount, 3, '3 get requests to github api');
     assert.equal(got.post.callCount, 1, '1 post request to github api');
