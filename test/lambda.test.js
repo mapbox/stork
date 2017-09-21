@@ -93,6 +93,47 @@ const fakeForwarderEvent = {
   ]
 };
 
+test('[lamdba] trigger: ignore events representing branch deletion', (assert) => {
+  const event = {
+    Records: [
+      {
+        Sns: {
+          Message: JSON.stringify({
+            deleted: true,
+            after: '0000000000000000000000000000000000000000',
+            repository: {
+              name: 'fake',
+              owner: { name: 'mapbox' }
+            }
+          })
+        }
+      }
+    ]
+  };
+
+  lambda.trigger(event, {}, (err, result) => {
+    assert.ifError(err, 'success');
+    assert.equal(result, 'Ignoring branch deletion event', 'logs info that an event was ignored');
+    assert.end();
+  });
+});
+
+test('[lambda] trigger: catch decrypt errors', (assert) => {
+  sinon.stub(lambda, 'decrypt').callsFake(() => Promise.reject(new Error('foo')));
+
+  sinon.stub(got, 'post').callsFake(() => Promise.resolve());
+
+  lambda.trigger(fakeTriggerEvent, {}, (err) => {
+    assert.equal(err.message, 'foo', 'passes error to Lambda for logging');
+
+    assert.equal(got.post.callCount, 0, 'cannot update status on github without decrypting env vars');
+
+    lambda.decrypt.restore();
+    got.post.restore();
+    assert.end();
+  });
+});
+
 test('[lambda] trigger: new project, no overrides', (assert) => {
   const environment = env(triggerVars).mock();
 

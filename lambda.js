@@ -399,6 +399,8 @@ stork.trigger = (event, context, callback) => {
         .then((data) => callback(null, data));
     })
     .catch((err) => {
+      if (!options.token) return callback(err);
+
       const uri = `https://api.github.com/repos/${options.org}/${options.repo}/statuses/${options.sha}`;
       const status = {
         context: 'stork',
