@@ -1,6 +1,6 @@
 FROM amazonlinux
 
-RUN yum install -y wget zip
+RUN yum install -y wget zip gcc-c++
 RUN curl -sL https://nodejs.org/dist/v6.11.1/node-v6.11.1-linux-x64.tar.gz | tar zxC /usr/local --strip-components=1
 RUN rm -rf /usr/local/lib/node_modules/npm && \
   mkdir /usr/local/lib/node_modules/npm && \
