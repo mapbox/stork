@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/stork",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Continuous integration system to build Lambda packages",
   "main": "index.js",
   "repository": "git@github.com:mapbox/stork",

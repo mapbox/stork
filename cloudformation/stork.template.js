@@ -8,13 +8,23 @@ const Parameters = {
   GithubAppId: { Type: 'String', Description: 'Your Github app ID' },
   GithubAppInstallationId: { Type: 'String', Description: 'The installation ID of your Github app' },
   GithubAppPrivateKey: { Type: 'String', Description: '[secure] A private key for your Github app' },
+  GithubAccessToken: { Type: 'String', Description: '[secure] A personal access token that can update Github Apps' },
   NpmAccessToken: { Type: 'String', Description: '[secure] An NPM access token with access to private modules' },
   OutputBucketPrefix: { Type: 'String', Description: 'Prefix of bucket name that will house bundles' },
   OutputBucketRegions: { Type: 'String', Description: 'Regions used as bucket name suffixes' },
-  OutputKeyPrefix: { Type: 'String', Description: 'Key prefix within the bucket for bundles' }
+  OutputKeyPrefix: { Type: 'String', Description: 'Key prefix within the bucket for bundles' },
+  AlarmEmail: { Type: 'String', Description: 'An email address to receive alarm notifications' }
 };
 
 const Resources = {
+  AlarmSNSTopic: {
+    Type: 'AWS::SNS::Topic',
+    Properties: {
+      Subscription: [
+        { Protocol: 'email', Endpoint: cf.ref('AlarmEmail') }
+      ]
+    }
+  },
   ProjectRole: {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -159,6 +169,24 @@ const Resources = {
       }
     }
   },
+  TriggerLambdaErrorAlarm: {
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-trigger-function-errors'),
+      Period: 60,
+      EvaluationPeriods: 1,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('TriggerLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
+  },
   StatusLambdaRole: {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -225,6 +253,24 @@ const Resources = {
           GITHUB_APP_PRIVATE_KEY: cf.ref('GithubAppPrivateKey')
         }
       }
+    }
+  },
+  StatusLambdaErrorAlarm: {
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-status-function-errors'),
+      Period: 60,
+      EvaluationPeriods: 5,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('StatusLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
     }
   },
   StatusFunctionPermission: {
@@ -303,6 +349,24 @@ const Resources = {
       }
     }
   },
+  ForwarderLambdaErrorAlarm: {
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-forwarder-function-errors'),
+      Period: 60,
+      EvaluationPeriods: 5,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('ForwarderLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
+  },
   ForwarderLambdaPermission: {
     Type: 'AWS::Lambda::Permission',
     Properties: {
@@ -311,11 +375,92 @@ const Resources = {
       Principal: 's3.amazonaws.com',
       SourceArn: cf.sub('arn:${AWS::Partition}:s3:::${OutputBucketPrefix}-${AWS::Region}')
     }
+  },
+  GatekeeperLambdaLogs: {
+    Type: 'AWS::Logs::LogGroup',
+    Properties: {
+      LogGroupName: cf.sub('/aws/lambda/${AWS::StackName}-gatekeeper'),
+      RetentionInDays: 14
+    }
+  },
+  GatekeeperLambdaRole: {
+    Type: 'AWS::IAM::Role',
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: 'sts:AssumeRole',
+            Principal: { Service: 'lambda.amazonaws.com' }
+          }
+        ]
+      },
+      Policies: [
+        {
+          PolicyName: 'gatekeeper-to-app',
+          PolicyDocument: {
+            Statement: [
+              {
+                Effect: 'Allow',
+                Action: 'logs:*',
+                Resource: cf.getAtt('GatekeeperLambdaLogs', 'Arn')
+              },
+              {
+                Effect: 'Allow',
+                Action: 'kms:Decrypt',
+                Resource: cf.importValue('cloudformation-kms-production')
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  GatekeeperLambda: {
+    Type: 'AWS::Lambda::Function',
+    Properties: {
+      FunctionName: cf.sub('${AWS::StackName}-gatekeeper'),
+      Description: 'Add repositories to Github app',
+      Code: {
+        S3Bucket: cf.sub('${OutputBucketPrefix}-${AWS::Region}'),
+        S3Key: cf.sub('${OutputKeyPrefix}/stork/${GitSha}.zip')
+      },
+      Runtime: 'nodejs6.10',
+      Timeout: 300,
+      Handler: 'lambda.gatekeeper',
+      MemorySize: 128,
+      Role: cf.getAtt('GatekeeperLambdaRole', 'Arn'),
+      Environment: {
+        Variables: {
+          GITHUB_ACCESS_TOKEN: cf.ref('GithubAccessToken'),
+          GITHUB_APP_INSTALLATION_ID: cf.ref('GithubAppInstallationId')
+        }
+      }
+    }
+  },
+  GatekeeperLambdaErrorAlarm: {
+    Type: 'AWS::CloudWatch::Alarm',
+    Properties: {
+      AlarmName: cf.sub('${AWS::StackName}-gatekeeper-function-errors'),
+      Period: 60,
+      EvaluationPeriods: 5,
+      Statistic: 'Sum',
+      Threshold: 0,
+      ComparisonOperator: 'GreaterThanThreshold',
+      TreatMissingData: 'notBreaching',
+      Namespace: 'AWS/Lambda',
+      Dimensions: [
+        { Name: 'FunctionName', Value: cf.ref('GatekeeperLambda') }
+      ],
+      MetricName: 'Errors',
+      AlarmActions: [cf.ref('AlarmSNSTopic')]
+    }
   }
 };
 
 const Outputs = {
-  GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') }
+  GithubAppInstallationId: { Value: cf.ref('GithubAppInstallationId') },
+  GatekeeperLambda: { Value: cf.ref('GatekeeperLambda') }
 };
 
 const webhook = hookshot.github('TriggerLambda');

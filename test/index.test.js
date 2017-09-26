@@ -23,6 +23,10 @@ test('[setupHook] success', (assert) => {
             {
               OutputKey: 'GithubAppInstallationId',
               OutputValue: '54321'
+            },
+            {
+              OutputKey: 'GatekeeperLambda',
+              OutputValue: 'functionname'
             }
           ]
         }
@@ -31,7 +35,10 @@ test('[setupHook] success', (assert) => {
   });
 
   sinon.stub(got, 'get').callsFake(() => Promise.resolve({ body: { id: 1234 } }));
-  sinon.stub(got, 'put').callsFake(() => Promise.resolve());
+
+  const invoke = AWS.stub('Lambda', 'invoke', function() {
+    this.request.promise.returns(Promise.resolve());
+  });
 
   const options = {
     region: 'us-east-1',
@@ -68,24 +75,19 @@ test('[setupHook] success', (assert) => {
       );
 
       assert.ok(
-        got.put.calledWith(
-          'https://api.github.com/user/installations/54321/repositories/1234?access_token=xxx',
-          {
-            json: true,
-            headers: {
-              'User-Agent': 'github.com/mapbox/stork',
-              Accept: 'application/vnd.github.machine-man-preview+json'
-            }
-          }
-        ),
-        'added repo to github app installation'
+        invoke.calledWith({
+          FunctionName: 'functionname',
+          InvocationType: 'RequestResponse',
+          Payload: JSON.stringify({ repoId: 1234, installationId: 54321 })
+        }),
+        'invoked gatekeeper lambda function for the right repository'
       );
     })
     .catch((err) => assert.ifError(err, 'failed'))
     .then(() => {
       AWS.CloudFormation.restore();
       got.get.restore();
-      got.put.restore();
+      AWS.Lambda.restore();
       assert.end();
     });
 });
