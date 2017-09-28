@@ -497,7 +497,7 @@ stork.status = (event, context, callback) => {
         sanitized.headers.Authorization = 'scrubbed';
         console.log(`POST ${uri}`);
         console.log(`headers ${JSON.stringify(sanitized.headers)}`);
-        console.log(`body ${sanitized.body`});
+        console.log(`body ${sanitized.body}`);
 
         return got.post(uri, config);
       })
