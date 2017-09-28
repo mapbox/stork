@@ -493,6 +493,12 @@ stork.status = (event, context, callback) => {
           body: JSON.stringify(status)
         };
 
+        const sanitized = JSON.parse(JSON.stringify(config));
+        sanitized.headers.Authorization = 'scrubbed';
+        console.log(`POST ${uri}`);
+        console.log(`headers ${JSON.stringify(sanitized.headers)}`);
+        console.log(`body ${sanitized.body`});
+
         return got.post(uri, config);
       })
       .then(() => callback())
