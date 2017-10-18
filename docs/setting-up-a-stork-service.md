@@ -59,7 +59,7 @@ Consider setting up a stack based on https://github.com/mapbox/cloudformation-km
   cd stork && npm install
   ```
 
-3. Run stork's boostrapping script, providing it with the information you've gathers in the above steps:
+3. Run stork's boostrapping script, providing it with the information you've gathered in the above steps:
 
   ```
   $ git clone https://github.com/mapbox/stork
