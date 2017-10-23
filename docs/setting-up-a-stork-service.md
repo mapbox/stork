@@ -34,12 +34,7 @@ To create a new Github App:
 7. Next, create an installation of the app in you organization's account. Simply provide a list of repositories in your account that stork will watch. This list can easily have other repositories added to it later.
 8. Record the new installation's ID, which is visible in the URL for the installation itself.
 
-### Two tokens
-
-Finally, you must provide
-
-- an NPM access token with permission to clone any private repositories that your bundles may depend on.
-- a Github token for a user with owner-level permission to your organization. This will allow future repositories to easily be added to the Github app's list.
+Finally, you must provide an NPM access token with permission to clone any private repositories that your bundles may depend on.
 
 ### Recommended step: CloudFormation stack parameter encryption
 
@@ -74,7 +69,6 @@ Consider setting up a stack based on https://github.com/mapbox/cloudformation-km
   >   --installation-id 54321 \
   >   --app-keyfile /path/to/private.pem \
   >   --npm-token xxx \
-  >   --github-token xxx \
   >   --kms
   ```
 
