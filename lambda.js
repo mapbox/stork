@@ -512,19 +512,25 @@ stork.status = (event, context, callback) => {
       })
       .then(() => callback())
       .catch((err) => {
+        const shaToken = jwt.sign(
+          {
+            iss: appId,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + (10 * 60)
+          },
+          privateKey,
+          { algorithm: 'RS256' }
+        );
         const shaUri = `https://api.github.com/repos/${owner}/${repo}/commits/${sha}`;
         const shaConfig = {
           json: true,
           headers: {
             'User-Agent': 'github.com/mapbox/stork',
             Accept: 'application/vnd.github.machine-man-preview+json',
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${shaToken}`
           }
         };
-        console.log('##############');
-        console.log(shaUri);
-        console.log(shaConfig);
-        console.log('##############');
+
         got.get(shaUri, shaConfig)
           .then((res) => {
             console.log(err);
