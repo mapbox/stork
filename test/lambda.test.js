@@ -1366,7 +1366,7 @@ test('[lambda] status: github error, sha exists', (assert) => {
 
   sinon.stub(got, 'get')
     .onCall(0).callsFake(() => Promise.resolve())
-    .onCall(1).callsFake(() => Promise.reject({
+    .onCall(1).callsFake(() => Promise.resolve({
       statusCode: 200,
       statusMessage: 'OK',
       body: {
@@ -1375,7 +1375,10 @@ test('[lambda] status: github error, sha exists', (assert) => {
     }));
 
   sinon.stub(got, 'post')
-    .onCall(0).callsFake(() => Promise.reject({
+    .onCall(0).callsFake(() => Promise.resolve({
+      body: { token: 'v1.1f699f1069f60xxx' }
+    }))
+    .onCall(1).callsFake(() => Promise.reject({
       statusCode: 422,
       statusMessage: 'Unprocessable Entity'
     }));
@@ -1385,7 +1388,7 @@ test('[lambda] status: github error, sha exists', (assert) => {
     const auth = args[1].headers.Authorization.replace('Bearer ', '');
     const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
 
-    assert.equal(err.message, 'Response code 422 (Unprocessable Entity)', 'errors');
+    assert.equal(err.statusMessage, 'Unprocessable Entity', 'errors');
     assert.ok(
       got.post.calledWith(
         'https://api.github.com/repos/mapbox/stork/statuses/12345shaexists',

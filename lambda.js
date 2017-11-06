@@ -508,6 +508,8 @@ stork.status = (event, context, callback) => {
         console.log(`headers ${JSON.stringify(sanitized.headers)}`);
         console.log(`body ${sanitized.body}`);
 
+        console.log(uri);
+        console.log(config);
         return got.post(uri, config);
       })
       .then(() => callback())
