@@ -460,19 +460,28 @@ stork.status = (event, context, callback) => {
         .catch((err) => Traceable.promise(err))
     ];
 
+    let token;
+    let data;
+    let build;
+    let logs;
+    let sha;
+    let source;
+    let owner;
+    let repo;
+
     Promise.all(requests)
       .then((results) => {
-        const token = results[0];
-        const data = results[1];
+        token = results[0];
+        data = results[1];
 
-        const build = data.builds[0];
+        build = data.builds[0];
         if (!build) return;
 
-        const logs = build.logs.deepLink;
-        const sha = build.sourceVersion;
-        const source = url.parse(build.source.location);
-        const owner = source.pathname.split('/')[1];
-        const repo = source.pathname.split('/')[2].replace(/.git$/, '');
+        logs = build.logs.deepLink;
+        sha = build.sourceVersion;
+        source = url.parse(build.source.location);
+        owner = source.pathname.split('/')[1];
+        repo = source.pathname.split('/')[2].replace(/.git$/, '');
 
         const uri = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}`;
         const status = {
@@ -503,8 +512,33 @@ stork.status = (event, context, callback) => {
       })
       .then(() => callback())
       .catch((err) => {
-        console.log(err);
-        callback(err);
+        const shaUri = `https://api.github.com/repos/${owner}/${repo}/commits/${sha}`;
+        const shaConfig = {
+          json: true,
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: `Bearer ${token}`
+          }
+        };
+        console.log('##############');
+        console.log(shaUri);
+        console.log(shaConfig);
+        console.log('##############');
+        got.get(shaUri, shaConfig)
+          .then((res) => {
+            console.log(err);
+            callback(err);
+          })
+          .catch((shaErr) => {
+            if (shaErr.statusCode === 404 && shaErr.statusMessage === 'Not Found') {
+              console.log(err);
+              console.log('Sha does not exist, ignore stork error');
+              return callback();
+            }
+            console.log(err);
+            callback(err);
+          });
       });
   });
 };
