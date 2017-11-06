@@ -1291,11 +1291,11 @@ test('[lambda] status: github error, no sha', (assert) => {
     }));
 
   lambda.status(fakeStatusEvent, {}, (err) => {
-    assert.ifError(err, 'does not error on missing GitSha');
+    const args = JSON.parse(JSON.stringify(got.post.args[0]));
+    const auth = args[1].headers.Authorization.replace('Bearer ', '');
+    const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
 
-    assert.ok(
-      got.get.onCall(1).calledWith()
-    ); 
+    assert.ifError(err, 'does not error on missing GitSha');
 
     assert.ok(
       got.post.calledWith(
@@ -1321,7 +1321,7 @@ test('[lambda] status: github error, no sha', (assert) => {
 
     assert.equal(got.get.callCount, 2, '2 get requests to github api');
     assert.ok(
-      got.get.onCall(1).calledWith(
+      got.get.calledWith(
         'https://api.github.com/repos/mapbox/stork/commits/529e7f60b159b18aabd7c699660b4b07603889c3',
         {
           json: true,
