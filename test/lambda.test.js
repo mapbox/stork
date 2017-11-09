@@ -1260,7 +1260,7 @@ test('[lambda] status: success', (assert) => {
   });
 });
 
-test('[lambda] status: github error, no sha', (assert) => {
+test('[lambda] status: github 422 error, get sha returns 404 not found', (assert) => {
   const environment = env(statusVars).mock();
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
@@ -1331,7 +1331,7 @@ test('[lambda] status: github error, no sha', (assert) => {
           headers: {
             'User-Agent': 'github.com/mapbox/stork',
             Accept: 'application/vnd.github.machine-man-preview+json',
-            Authorization: `Bearer ${auth}`
+            Authorization: 'token v1.1f699f1069f60xxx'
           }
         }
       ),
@@ -1347,7 +1347,94 @@ test('[lambda] status: github error, no sha', (assert) => {
   });
 });
 
-test('[lambda] status: github error, sha exists', (assert) => {
+test('[lambda] status: github 422 error, get sha returns non 404 error', (assert) => {
+  const environment = env(statusVars).mock();
+
+  sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
+
+  const getBuild = AWS.stub('CodeBuild', 'batchGetBuilds', function() {
+    this.request.promise.returns(Promise.resolve({
+      builds: [
+        {
+          logs: { deepLink: 'url for cloudwatch logs' },
+          sourceVersion: '12345shanotfound',
+          source: { location: 'https://github.com/mapbox/stork' }
+        }
+      ]
+    }));
+  });
+
+  sinon.stub(got, 'get')
+    .onCall(0).callsFake(() => Promise.resolve())
+    .onCall(1).callsFake(() => Promise.reject({
+      statusCode: 500,
+      statusMessage: 'Backend Error'
+    }));
+
+  sinon.stub(got, 'post')
+    .onCall(0).callsFake(() => Promise.resolve({
+      body: { token: 'v1.1f699f1069f60xxx' }
+    }))
+    .onCall(1).callsFake(() => Promise.reject({
+      statusCode: 422,
+      statusMessage: 'Unprocessable Entity'
+    }));
+
+  lambda.status(fakeStatusEvent, {}, (err) => {
+    const args = JSON.parse(JSON.stringify(got.post.args[0]));
+    const auth = args[1].headers.Authorization.replace('Bearer ', '');
+    const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
+
+    assert.equal(err.statusMessage, 'Unprocessable Entity', 'errors');
+
+    assert.ok(
+      got.post.calledWith(
+        'https://api.github.com/repos/mapbox/stork/statuses/12345shanotfound',
+        {
+          json: true,
+          headers: {
+            'Content-type': 'application/json',
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: 'token v1.1f699f1069f60xxx'
+          },
+          body: JSON.stringify({
+            context: 'stork',
+            description: 'Your build succeeded',
+            state: 'success',
+            target_url: 'url for cloudwatch logs'
+          })
+        }
+      ),
+      'sets PR status via github api request'
+    );
+
+    assert.equal(got.get.callCount, 2, '2 get requests to github api');
+    assert.ok(
+      got.get.calledWith(
+        'https://api.github.com/repos/mapbox/stork/commits/12345shanotfound',
+        {
+          json: true,
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            Accept: 'application/vnd.github.machine-man-preview+json',
+            Authorization: 'token v1.1f699f1069f60xxx'
+          }
+        }
+      ),
+      'call to check if sha exists'
+    );
+
+    environment.restore();
+    got.get.restore();
+    got.post.restore();
+    lambda.decrypt.restore();
+    AWS.CodeBuild.restore();
+    assert.end();
+  });
+});
+
+test('[lambda] status: github 422 error, get sha returns 200', (assert) => {
   const environment = env(statusVars).mock();
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
@@ -1420,7 +1507,7 @@ test('[lambda] status: github error, sha exists', (assert) => {
           headers: {
             'User-Agent': 'github.com/mapbox/stork',
             Accept: 'application/vnd.github.machine-man-preview+json',
-            Authorization: `Bearer ${auth}`
+            Authorization: 'token v1.1f699f1069f60xxx'
           }
         }
       ),

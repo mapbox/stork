@@ -508,28 +508,17 @@ stork.status = (event, context, callback) => {
         console.log(`headers ${JSON.stringify(sanitized.headers)}`);
         console.log(`body ${sanitized.body}`);
 
-        console.log(uri);
-        console.log(config);
         return got.post(uri, config);
       })
       .then(() => callback())
       .catch((err) => {
-        const shaToken = jwt.sign(
-          {
-            iss: appId,
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + (10 * 60)
-          },
-          privateKey,
-          { algorithm: 'RS256' }
-        );
         const shaUri = `https://api.github.com/repos/${owner}/${repo}/commits/${sha}`;
         const shaConfig = {
           json: true,
           headers: {
             'User-Agent': 'github.com/mapbox/stork',
             Accept: 'application/vnd.github.machine-man-preview+json',
-            Authorization: `Bearer ${shaToken}`
+            Authorization: `token ${token}`
           }
         };
 
@@ -540,7 +529,6 @@ stork.status = (event, context, callback) => {
           })
           .catch((shaErr) => {
             if (shaErr.statusCode === 404 && shaErr.statusMessage === 'Not Found') {
-              console.log(err);
               console.log('Sha does not exist, ignore stork error');
               return callback();
             }
