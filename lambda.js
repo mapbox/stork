@@ -461,25 +461,21 @@ stork.status = (event, context, callback) => {
     ];
 
     let token;
-    let data;
-    let build;
-    let logs;
     let sha;
-    let source;
     let owner;
     let repo;
 
     Promise.all(requests)
       .then((results) => {
         token = results[0];
-        data = results[1];
+        const data = results[1];
 
-        build = data.builds[0];
+        const build = data.builds[0];
         if (!build) return;
 
-        logs = build.logs.deepLink;
+        const logs = build.logs.deepLink;
         sha = build.sourceVersion;
-        source = url.parse(build.source.location);
+        const source = url.parse(build.source.location);
         owner = source.pathname.split('/')[1];
         repo = source.pathname.split('/')[2].replace(/.git$/, '');
 
