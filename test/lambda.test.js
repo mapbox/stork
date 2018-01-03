@@ -1575,39 +1575,3 @@ test('[lambda] forwarder: one-region failure', (assert) => {
     assert.end();
   });
 });
-
-test('[lambda] gatekeeper', (assert) => {
-  const environment = env({
-    GITHUB_APP_INSTALLATION_ID: '54321',
-    GITHUB_ACCESS_TOKEN: 'secure:abcdefg'
-  }).mock();
-
-  sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
-
-  sinon.stub(got, 'put').callsFake(() => Promise.resolve());
-
-  const event = { repoId: 1234 };
-
-  lambda.gatekeeper(event, {}, (err) => {
-    assert.ifError(err, 'success');
-
-    assert.ok(
-      got.put.calledWith(
-        'https://api.github.com/user/installations/54321/repositories/1234?access_token=abcdefg',
-        {
-          json: true,
-          headers: {
-            'User-Agent': 'github.com/mapbox/stork',
-            Accept: 'application/vnd.github.machine-man-preview+json'
-          }
-        }
-      ),
-      'added repo to github app installation'
-    );
-
-    environment.restore();
-    lambda.decrypt.restore();
-    got.put.restore();
-    assert.end();
-  });
-});

@@ -16,7 +16,6 @@ const got = require('got');
  */
 const setupHook = (options) => {
   const cfn = new AWS.CloudFormation({ region: options.region });
-  const lambda = new AWS.Lambda({ region: options.region });
 
   const repo = () => {
     const query = { access_token: options.token };
@@ -35,6 +34,22 @@ const setupHook = (options) => {
       .then((data) => data.body.id);
   };
 
+  const app = (repoId, installationId) => {
+    const query = { access_token: options.token };
+
+    const config = {
+      json: true,
+      headers: {
+        'User-Agent': 'github.com/mapbox/stork',
+        Accept: 'application/vnd.github.machine-man-preview+json'
+      }
+    };
+
+    const uri = `https://api.github.com/user/installations/${installationId}/repositories/${repoId}`;
+
+    return got.put(`${uri}?${querystring.stringify(query)}`, config);
+  };
+
   return Promise.all([
     repo(),
     cfn.describeStacks({ StackName: `stork-${options.suffix}` }).promise()
@@ -43,18 +58,11 @@ const setupHook = (options) => {
     const data = results[1];
 
     const outputs = data.Stacks[0].Outputs;
-    const installationId = Number(outputs
+    const installationId = outputs
       .find((output) => output.OutputKey === 'GithubAppInstallationId')
-      .OutputValue);
-    const FunctionName = outputs
-      .find((output) => output.OutputKey === 'GatekeeperLambda')
       .OutputValue;
 
-    return lambda.invoke({
-      FunctionName,
-      InvocationType: 'RequestResponse',
-      Payload: JSON.stringify({ repoId, installationId })
-    }).promise();
+    return app(repoId, installationId);
   });
 };
 
