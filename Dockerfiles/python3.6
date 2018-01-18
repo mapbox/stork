@@ -15,3 +15,5 @@ RUN curl https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz | tar -xJ \
     && rm -rf Python-3.6.1
 
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
+RUN pip3 install numpy wheel cython --no-binary numpy
