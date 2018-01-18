@@ -17,7 +17,7 @@ There are several pieces of information that need to be collected prior to confi
 Stork provides a Node.js function and a CLI tool that can be used to set this up if you've gathered the following information:
 
 - **The region** that your account's stork stack runs in
-- **The suffix** of your account's stork stack, as in `the stork-${sufffix} stack`.
+- **The suffix** of your account's stork stack, as in `the stork-${suffix} stack`.
 - **Your personal access token** which will be used to make github requests to configure the repository for stork to watch.
 - **The org name** of the repository you wish stork to watch
 - **The repository name** for stork to watch
@@ -31,7 +31,7 @@ The token will only be used once to set up webhooks, and after that you can dele
 
 With those information in hand, you can chose to configure stork to watch your repository using either a CLI command or by writing a Node.js script.
 
-The following examples connects `my-repo` owned by `mapbox` to a `production` stork stack in `us-east-1`:
+The following example connects `my-repo` owned by `mapbox` to a `production` stork stack in `us-east-1`:
 
 **via CLI**
 
@@ -125,4 +125,4 @@ See [the AWS CodeBuild documentation](https://docs.aws.amazon.com/codebuild/late
 
 This file, if provided, determines what actions will be taken during a CodeBuild run on each commit. By defining this file in your repository, you take complete control over the CodeBuild actions, and can use it to take whatever build actions you'd like to.
 
-See [the AWS CodeBuild documentation](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html) to understand this file's sytax and capabilities.
+See [the AWS CodeBuild documentation](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html) to understand this file's syntax and capabilities.
