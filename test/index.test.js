@@ -34,8 +34,6 @@ test('[setupHook] success', (assert) => {
     }));
   });
 
-  sinon.stub(got, 'get').callsFake(() => Promise.resolve({ body: { id: 1234 } }));
-
   const invoke = AWS.stub('Lambda', 'invoke', function() {
     this.request.promise.returns(Promise.resolve());
   });
@@ -43,7 +41,6 @@ test('[setupHook] success', (assert) => {
   const options = {
     region: 'us-east-1',
     suffix: 'staging',
-    token: 'xxx',
     org: 'mapbox',
     repo: 'foobar'
   };
@@ -61,24 +58,10 @@ test('[setupHook] success', (assert) => {
       );
 
       assert.ok(
-        got.get.calledWith(
-          'https://api.github.com/repos/mapbox/foobar?access_token=xxx',
-          {
-            json: true,
-            headers: {
-              'User-Agent': 'github.com/mapbox/stork',
-              'Content-Type': 'application/json'
-            }
-          }
-        ),
-        'looked up correct repo data via github api'
-      );
-
-      assert.ok(
         invoke.calledWith({
           FunctionName: 'functionname',
           InvocationType: 'RequestResponse',
-          Payload: JSON.stringify({ repoId: 1234, installationId: 54321 })
+          Payload: JSON.stringify({ repo: 'foobar', org: 'mapbox', installationId: 54321 })
         }),
         'invoked gatekeeper lambda function for the right repository'
       );
@@ -86,7 +69,6 @@ test('[setupHook] success', (assert) => {
     .catch((err) => assert.ifError(err, 'failed'))
     .then(() => {
       AWS.CloudFormation.restore();
-      got.get.restore();
       AWS.Lambda.restore();
       assert.end();
     });

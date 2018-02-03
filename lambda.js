@@ -585,11 +585,24 @@ stork.forwarder = (event, context, callback) => {
 };
 
 stork.gatekeeper = (event, context, callback) => {
-  if (!event.repoId)
-    return callback(new Error('repoId not specified'));
+  if (!event.repo) return callback(new Error('repo not specified'));
+  if (!event.org) return callback(new Error('org not specified'));
 
   stork.decrypt(process.env)
     .then(() => {
+      const query = { access_token: process.env.GITHUB_ACCESS_TOKEN };
+      const config = {
+        json: true,
+        headers: {
+          'User-Agent': 'github.com/mapbox/stork',
+          'Content-Type': 'application/json'
+        }
+      };
+      const uri = `https://api.github.com/repos/${event.repo}/${event.org}`;
+      return got.get(`${uri}?${querystring.stringify(query)}`, config)
+        .then((data) => data.body.id);
+    })
+    .then((repoId) => {
       const token = process.env.GITHUB_ACCESS_TOKEN;
       const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
 
@@ -603,7 +616,7 @@ stork.gatekeeper = (event, context, callback) => {
         }
       };
 
-      const uri = `https://api.github.com/user/installations/${installationId}/repositories/${event.repoId}`;
+      const uri = `https://api.github.com/user/installations/${installationId}/repositories/${repoId}`;
 
       return got.put(`${uri}?${querystring.stringify(query)}`, config);
     })

@@ -1583,13 +1583,27 @@ test('[lambda] gatekeeper', (assert) => {
   }).mock();
 
   sinon.stub(lambda, 'decrypt').callsFake(fakeDecrypt);
-
+  sinon.stub(got, 'get').callsFake(() => Promise.resolve({ body: { id: 1234 } }));
   sinon.stub(got, 'put').callsFake(() => Promise.resolve());
 
-  const event = { repoId: 1234 };
+  const event = { repo: 'repo', org: 'mapbox' };
 
   lambda.gatekeeper(event, {}, (err) => {
     assert.ifError(err, 'success');
+
+    assert.ok(
+      got.get.calledWith(
+        'https://api.github.com/repos/repo/mapbox?access_token=abcdefg',
+        {
+          json: true,
+          headers: {
+            'User-Agent': 'github.com/mapbox/stork',
+            'Content-Type': 'application/json'
+          }
+        }
+      ),
+      'described github repo with correct params'
+    );
 
     assert.ok(
       got.put.calledWith(
@@ -1607,6 +1621,7 @@ test('[lambda] gatekeeper', (assert) => {
 
     environment.restore();
     lambda.decrypt.restore();
+    got.get.restore();
     got.put.restore();
     assert.end();
   });

@@ -10,25 +10,22 @@ const hook = require('..').setupHook;
 const cli = meow(`
   USAGE: ./bin/hook.js [options]
 
-  All options are not optional.
+  All options are required.
 
   OPTIONS:
     -r, --regions
     -s, --suffix
-    -t, --token
     -o, --org
     -n, --repo
 `, {
   alias: {
     r: 'regions',
     s: 'suffix',
-    t: 'token',
     o: 'org',
     n: 'repo'
   },
   string: [
     'suffix',
-    'token',
     'org',
     'repo'
   ]
