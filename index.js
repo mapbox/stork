@@ -13,9 +13,9 @@ const got = require('got');
  * @param  {String}  options.repo         - github repo's name
  * @return {Promise}                      - resolves when the hook has been created
  */
-const setupHook = (options) => {
-  const cfn = new AWS.CloudFormation({ region: options.region });
-  const lambda = new AWS.Lambda({ region: options.region });
+const setupHook = (options, cfn, lambda) => {
+  cfn = cfn || new AWS.CloudFormation({ region: options.region });
+  lambda = lambda || new AWS.Lambda({ region: options.region });
 
   return cfn.describeStacks({ StackName: `stork-${options.suffix}` }).promise()
     .then((data) => {
