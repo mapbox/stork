@@ -520,7 +520,7 @@ stork.status = (event, context, callback) => {
         };
 
         got.get(shaUri, shaConfig)
-          .then((res) => {
+          .then(() => {
             console.log(err);
             callback(err);
           })

@@ -839,7 +839,7 @@ test('[lambda] trigger: new project, image override [nodejs8.10]', (assert) => {
     assert.end();
   });
 });
-  
+
 
 test('[lambda] trigger: new project, image, buildspec, size override', (assert) => {
   const environment = env(triggerVars).mock();
@@ -1424,8 +1424,15 @@ test('[lambda] status: github 422 error, get sha returns 404 not found', (assert
     const args = JSON.parse(JSON.stringify(got.post.args[0]));
     const auth = args[1].headers.Authorization.replace('Bearer ', '');
     const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
+    assert.equal(decoded.iss, 54321, 'constructed valid jwt token using installationId and privateKey');
 
     assert.ifError(err, 'does not error on missing GitSha');
+
+    assert.equal(getBuild.callCount, 1, 'one batchGetBuilds request');
+    assert.ok(
+      getBuild.calledWith({ ids: ['build-id'] }),
+      'looks for build by ID in the invocation event'
+    );
 
     assert.ok(
       got.post.calledWith(
@@ -1511,8 +1518,15 @@ test('[lambda] status: github 422 error, get sha returns non 404 error', (assert
     const args = JSON.parse(JSON.stringify(got.post.args[0]));
     const auth = args[1].headers.Authorization.replace('Bearer ', '');
     const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
+    assert.equal(decoded.iss, 54321, 'constructed valid jwt token using installationId and privateKey');
 
     assert.equal(err.statusMessage, 'Unprocessable Entity', 'errors');
+
+    assert.equal(getBuild.callCount, 1, 'one batchGetBuilds request');
+    assert.ok(
+      getBuild.calledWith({ ids: ['build-id'] }),
+      'looks for build by ID in the invocation event'
+    );
 
     assert.ok(
       got.post.calledWith(
@@ -1601,6 +1615,13 @@ test('[lambda] status: github 422 error, get sha returns 200', (assert) => {
     const args = JSON.parse(JSON.stringify(got.post.args[0]));
     const auth = args[1].headers.Authorization.replace('Bearer ', '');
     const decoded = jwt.verify(auth, publicKey, { algorithms: ['RS256'] });
+    assert.equal(decoded.iss, 54321, 'constructed valid jwt token using installationId and privateKey');
+
+    assert.equal(getBuild.callCount, 1, 'one batchGetBuilds request');
+    assert.ok(
+      getBuild.calledWith({ ids: ['build-id'] }),
+      'looks for build by ID in the invocation event'
+    );
 
     assert.equal(err.statusMessage, 'Unprocessable Entity', 'errors');
     assert.ok(
