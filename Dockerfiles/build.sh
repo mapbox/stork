@@ -31,6 +31,11 @@ docker build -t stork:nodejs6.x -f ./nodejs6.x ./
 docker tag stork:nodejs6.x "${uri}:nodejs6.x"
 docker push "${uri}:nodejs6.x"
 
+# Build, tag and push the nodejs8.10 docker image
+docker build -t stork:nodejs8.10 -f ./nodejs8.10 ./
+docker tag stork:nodejs8.10 "${uri}:nodejs8.10"
+docker push "${uri}:nodejs8.10"
+
 # Build, tag and push the python2.7 docker image
 docker build -t stork:python2.7 -f ./python2.7 ./
 docker tag stork:python2.7 "${uri}:python2.7"

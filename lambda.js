@@ -298,6 +298,7 @@ const checkRepoOverrides = (options) => {
  */
 const getImageUri = (options) => {
   const defaultImages = {
+    'nodejs8.10': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:nodejs8.10`,
     'nodejs6.x': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:nodejs6.x`,
     'nodejs4.3': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:nodejs4.3`,
     'python2.7': `${options.accountId}.dkr.ecr.${options.region}.amazonaws.com/stork:python2.7`,
@@ -519,7 +520,7 @@ stork.status = (event, context, callback) => {
         };
 
         got.get(shaUri, shaConfig)
-          .then((res) => {
+          .then(() => {
             console.log(err);
             callback(err);
           })

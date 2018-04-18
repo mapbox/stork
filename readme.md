@@ -83,6 +83,7 @@ There are four base images provided by stork. These correspond directly to Lambd
 
 - `nodejs6.x` (default)
 - `nodejs4.3`
+- `nodejs8.10`
 - `python2.7`
 - `python3.6`
 

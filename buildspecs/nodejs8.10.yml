@@ -1,0 +1,12 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - npm install -g decrypt-kms-env
+      - eval $(decrypt-kms-env) && echo "//registry.npmjs.org/:_authToken=${NPM_ACCESS_TOKEN}" > .npmrc
+      - npm install --production
+      - rm -f .npmrc
+      - rm -rf .git/
+artifacts:
+  files:
+    - '**/*'
