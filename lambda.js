@@ -119,10 +119,7 @@ const createProject = (options) => {
     environment: {
       type: 'LINUX_CONTAINER',
       image: options.imageUri,
-      computeType: `BUILD_GENERAL1_${options.size.toUpperCase()}`,
-      environmentVariables: [
-        { name: 'NPM_ACCESS_TOKEN', value: options.npmToken }
-      ]
+      computeType: `BUILD_GENERAL1_${options.size.toUpperCase()}`
     }
   };
 
@@ -203,7 +200,13 @@ const runBuild = (options) => {
       location: options.bucket,
       path: `${options.prefix}/${options.repo}`,
       name: `${options.sha}.zip`
-    }
+    },
+    environmentVariablesOverride: [
+      {
+        name: 'NPM_ACCESS_TOKEN',
+        value: options.npmToken
+      }
+    ]
   };
 
   if (options.buildspec) params.buildspecOverride = options.buildspec;
