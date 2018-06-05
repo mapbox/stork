@@ -319,10 +319,7 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
         environment: {
           type: 'LINUX_CONTAINER',
           image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/stork:nodejs6.x',
-          computeType: 'BUILD_GENERAL1_SMALL',
-          environmentVariables: [
-            { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
-          ]
+          computeType: 'BUILD_GENERAL1_SMALL'
         }
       }),
       'created a new project with the appropriate properties'
@@ -369,6 +366,12 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
           path: 'bundles/stork',
           name: 'abcdefg.zip'
         },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ],
         buildspecOverride: nodejs6Buildspec
       }),
       'runs the expected build'
@@ -458,6 +461,12 @@ test('[lambda] trigger: existing project, no overrides', (assert) => {
           path: 'bundles/stork',
           name: 'abcdefg.zip'
         },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ],
         buildspecOverride: nodejs6Buildspec
       }),
       'runs the expected build'
@@ -560,10 +569,7 @@ test('[lambda] trigger: new project, image override [python2.7]', (assert) => {
         environment: {
           type: 'LINUX_CONTAINER',
           image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/stork:python2.7',
-          computeType: 'BUILD_GENERAL1_SMALL',
-          environmentVariables: [
-            { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
-          ]
+          computeType: 'BUILD_GENERAL1_SMALL'
         }
       }),
       'created a new project with the appropriate properties'
@@ -580,6 +586,12 @@ test('[lambda] trigger: new project, image override [python2.7]', (assert) => {
           path: 'bundles/stork',
           name: 'abcdefg.zip'
         },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ],
         buildspecOverride: pythonBuildspec
       }),
       'runs the expected build'
@@ -682,10 +694,7 @@ test('[lambda] trigger: new project, image override [nodejs4.3]', (assert) => {
         environment: {
           type: 'LINUX_CONTAINER',
           image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/stork:nodejs4.3',
-          computeType: 'BUILD_GENERAL1_SMALL',
-          environmentVariables: [
-            { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
-          ]
+          computeType: 'BUILD_GENERAL1_SMALL'
         }
       }),
       'created a new project with the appropriate properties'
@@ -702,6 +711,12 @@ test('[lambda] trigger: new project, image override [nodejs4.3]', (assert) => {
           path: 'bundles/stork',
           name: 'abcdefg.zip'
         },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ],
         buildspecOverride: nodejs4Buildspec
       }),
       'runs the expected build'
@@ -804,10 +819,7 @@ test('[lambda] trigger: new project, image override [nodejs8.10]', (assert) => {
         environment: {
           type: 'LINUX_CONTAINER',
           image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/stork:nodejs8.10',
-          computeType: 'BUILD_GENERAL1_SMALL',
-          environmentVariables: [
-            { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
-          ]
+          computeType: 'BUILD_GENERAL1_SMALL'
         }
       }),
       'created a new project with the appropriate properties'
@@ -824,6 +836,12 @@ test('[lambda] trigger: new project, image override [nodejs8.10]', (assert) => {
           path: 'bundles/stork',
           name: 'abcdefg.zip'
         },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ],
         buildspecOverride: nodejs8Buildspec
       }),
       'runs the expected build'
@@ -934,10 +952,7 @@ test('[lambda] trigger: new project, image, buildspec, size override', (assert) 
         environment: {
           type: 'LINUX_CONTAINER',
           image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/stork:python2.7',
-          computeType: 'BUILD_GENERAL1_LARGE',
-          environmentVariables: [
-            { name: 'NPM_ACCESS_TOKEN', value: 'secure:d;alfsksadafwe' }
-          ]
+          computeType: 'BUILD_GENERAL1_LARGE'
         }
       }),
       'created a new project with the appropriate properties'
@@ -953,7 +968,13 @@ test('[lambda] trigger: new project, image, buildspec, size override', (assert) 
           location: 'mapbox-us-east-1',
           path: 'bundles/stork',
           name: 'abcdefg.zip'
-        }
+        },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ]
       }),
       'runs the expected build, inheriting buildspec.yml from the repo'
     );
@@ -1047,6 +1068,12 @@ test('[lambda] trigger: existing project, same overrides', (assert) => {
           path: 'bundles/stork',
           name: 'abcdefg.zip'
         },
+        environmentVariablesOverride: [
+          {
+            name: 'NPM_ACCESS_TOKEN',
+            value: triggerVars.NPM_ACCESS_TOKEN
+          }
+        ],
         buildspecOverride: pythonBuildspec
       }),
       'runs the expected build'
