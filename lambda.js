@@ -531,6 +531,9 @@ stork.status = (event, context, callback) => {
             if (shaErr.statusCode === 404 && shaErr.statusMessage === 'Not Found') {
               console.log('Sha does not exist, ignore stork error');
               return callback();
+            } else {
+              console.log('Attempted to fetch missing commit ' + sha + ', got this error:');
+              console.log(shaErr);
             }
             console.log(err);
             callback(err);
