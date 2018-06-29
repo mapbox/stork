@@ -87,7 +87,7 @@ There are four base images provided by stork. These correspond directly to Lambd
 - `python2.7`
 - `python3.6`
 
-For each of these environments, see the related Dockerfile in the `Dockerfiles` folder for the specifics of the build environment. Furthermore, the respective `.yml` files in the `buildspces` folder define the steps that will be taken to bundle your repository.
+For each of these environments, see the related Dockerfile in the `Dockerfiles` folder for the specifics of the build environment. Furthermore, the respective `.yml` files in the `buildspecs` folder define the steps that will be taken to bundle your repository.
 
 If you wish to build bundles for a runtime other than `nodejs6.10`, follow these steps:
 
