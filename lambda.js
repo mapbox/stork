@@ -523,19 +523,14 @@ stork.status = (event, context, callback) => {
         };
 
         got.get(shaUri, shaConfig)
-          .then(() => {
-            console.log(err);
-            callback(err);
-          })
+          .then(() => callback(err))
           .catch((shaErr) => {
-            if (shaErr.statusCode === 404 && shaErr.statusMessage === 'Not Found') {
+            if ((shaErr.statusCode === 404 && shaErr.statusMessage === 'Not Found')
+              || (shaErr.statusCode === 422 && shaErr.statusMessage === 'Unprocessable Entity')) {
               console.log('Sha does not exist, ignore stork error');
               return callback();
-            } else {
-              console.log('Attempted to fetch missing commit ' + sha + ', got this error:');
-              console.log(shaErr);
             }
-            console.log(err);
+            console.log(`Error trying to retrieve sha: ${shaErr.statusCode} ${shaErr.statusMessage}`);
             callback(err);
           });
       });
