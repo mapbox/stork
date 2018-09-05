@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@mapbox/cloudfriend": "^2.2.0",
-    "@mapbox/hookshot": "^3.0.2",
+    "@mapbox/hookshot": "^5.0.1",
     "@mapbox/mock-aws-sdk-js": "^1.0.0",
     "eslint": "^5.5.0",
     "eslint-plugin-node": "^7.0.1",
@@ -26,7 +26,7 @@
     "meow": "^5.0.0",
     "nyc": "^13.0.1",
     "opener": "^1.5.1",
-    "sinon": "^3.2.1",
+    "sinon": "^6.2.0",
     "tap-spec": "^5.0.0",
     "tape": "^4.9.1"
   },
