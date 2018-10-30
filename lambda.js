@@ -48,7 +48,7 @@ const githubToken = (appId, installationId, privateKey) => {
         }
       };
 
-      const uri = `https://api.github.com/installations/${installationId}/access_tokens`;
+      const uri = `https://api.github.com/app/installations/${installationId}/access_tokens`;
       return got.get('https://api.github.com/app', config)
         .then(() => got.post(uri, config));
     })

@@ -221,7 +221,7 @@ test('[lambda] trigger: new project, no overrides', (assert) => {
 
     delete args[1].headers.Authorization;
     assert.deepEqual(args, [
-      'https://api.github.com/installations/1234567/access_tokens',
+      'https://api.github.com/app/installations/1234567/access_tokens',
       {
         json: true,
         headers: {
@@ -1357,7 +1357,7 @@ test('[lambda] status: success', (assert) => {
 
     delete args[1].headers.Authorization;
     assert.deepEqual(args, [
-      'https://api.github.com/installations/1234567/access_tokens',
+      'https://api.github.com/app/installations/1234567/access_tokens',
       {
         json: true,
         headers: {
