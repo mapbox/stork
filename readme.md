@@ -1,3 +1,7 @@
+# :warning: Deprecation Notice :warning:
+
+**Stork** has been deprecated for use internally at Mapbox and will no longer be maintained.
+
 # stork [![Build Status](https://travis-ci.org/mapbox/stork.svg?branch=master)](https://travis-ci.org/mapbox/stork)
 
 <img src='./assets/stork.png' width=75%>
